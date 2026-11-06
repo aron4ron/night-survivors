@@ -59,9 +59,11 @@
       body.noscroll { position: fixed; left: 0; right: 0; top: 0; width: 100%; }
       .dot { font-family: "DotGothic16", "Hiragino Kaku Gothic ProN", sans-serif; }
 
-      /* 高さは dvh（実際に見えている高さ）で決める：ブラウザUIの開閉で変わる
-         レイアウト基準の高さに引きずられると、上下に黒帯が出たり下端が隠れたりする */
-      #wrap { position: fixed; inset: 0; height: 100%; height: 100dvh; touch-action: none; }
+      /* 高さは CSS の単位（dvh 等）に頼らず、JS の resize() がこのフレーム自身の
+         見えている高さ（innerHeight）を px で直接指定する。dvh は iframe 内では
+         親ページ側のビューポートで計算される端末があり、実際より小さい値になると
+         ラッパーが画面より短くなって下側に黒帯が出る（大きいと下端が見切れる） */
+      #wrap { position: fixed; inset: 0; touch-action: none; }
       canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
       /* 周辺減光（夜の雰囲気） */
       #vignette {
@@ -73,7 +75,9 @@
       #hud { position: absolute; inset: 0; pointer-events: none; display: none; }
       #hud.on { display: block; }
       #xpbar {
-        position: absolute; top: 0; left: 0; right: 0; height: 14px;
+        /* 他のHUDと同じくセーフエリア分だけ下げる：top:0 のままだと iPhone の
+           ノッチ／ステータスバー（約47px）の裏にバー全体が隠れて見えなくなる */
+        position: absolute; top: var(--sat); left: 0; right: 0; height: 14px;
         background: #0a0f22; border-bottom: 2px solid #000;
       }
       #xpfill {
@@ -1043,14 +1047,18 @@
        ========================================================= */
 
     const cv = document.getElementById("game");
+    const wrapEl = document.getElementById("wrap");
     const ctx = cv.getContext("2d");
-    let VW = 0, VH = 0, DPR = 1;
+    let VW = 0, VH = 0, DPR = 1, wrapH = 0;
     function resize() {
       DPR = Math.min(window.devicePixelRatio || 1, 2);
-      /* 描画サイズはキャンバス要素の実際の表示サイズ（clientWidth/Height）から決める。
-         window.innerWidth/Height はブラウザUI（アドレスバー等）の開閉状態で
-         実際の表示領域とズレることがあり、そのズレが上下の黒帯（レターボックス）や
-         下端の見切れの原因になっていた。要素ぴったりに合わせれば必ず全面に広がる */
+      /* ラッパーの高さは、このフレーム自身の見えている高さ（innerHeight）を px で
+         直接合わせる。dvh 単位は iframe 内では親ページ側のビューポートで計算され、
+         実際の表示領域より小さく（下に黒帯）／大きく（下端見切れ）なる端末がある。
+         高さを決めてからキャンバスの表示サイズ（clientWidth/Height）を読むことで、
+         描画サイズと実際の表示領域が必ず一致する */
+      wrapH = window.innerHeight || 0;
+      if (wrapEl && wrapH > 0) wrapEl.style.height = wrapH + "px";
       VW = cv.clientWidth || window.innerWidth;
       VH = cv.clientHeight || window.innerHeight;
       const w = Math.floor(VW * DPR), h = Math.floor(VH * DPR);
@@ -5224,6 +5232,10 @@
       }
     });
     window.addEventListener("pagehide", () => { saveRun(); });
+    /* 端末によっては pagehide / visibilitychange が飛ばないまま WebView が
+       落ちることがあるため、フォーカス喪失と破棄直前でも保存して網を広げる */
+    window.addEventListener("blur", () => { saveRun(); });
+    window.addEventListener("beforeunload", () => { saveRun(); });
 
     el("startBtn").addEventListener("click", startGame);
     el("recordsBtn").addEventListener("click", openRecords);
@@ -5322,6 +5334,9 @@
         else update(dt);
       }
       else if (G.state === "title") { G.cam.x = Math.sin(ts * 0.00007) * 160; G.cam.y = Math.cos(ts * 0.00009) * 120; }
+      /* 表示領域の変化をイベントで取りこぼしたら（アプリ切り替え復帰時の
+         シェル側リサイズ等）その場で合わせ直す：黒帯・見切れの残りを防ぐ */
+      if (window.innerHeight !== wrapH || cv.clientWidth !== VW || cv.clientHeight !== VH) resize();
       draw();
     }
     requestAnimationFrame(frame);
