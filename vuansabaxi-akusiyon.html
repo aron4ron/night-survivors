@@ -762,7 +762,7 @@
             双剣の踊り子<b>アカリ</b>（双剣の連舞／最速だが最も打たれ弱い）、重騎士<b>ガルド</b>（衝撃ハンマー／鈍足だが圧倒的に頑丈）。
             ダックスは誰の相棒としてもついてくる。右上のミニマップには敵・ボス・宝箱の位置が点で表示される。
             プレイの累計記録は、下の「戦績を見る」からいつでも確認できる。
-            実績は全13個（初クリア、累計1000撃破、300コンボ、カイでクリア、カオス制覇、無傷3分、竜殺しなど）で、
+            実績は全18個（初クリア、累計5000撃破、300コンボ、各キャラでクリア、カオス制覇、無傷3分、竜殺し、二重進化など）で、
             達成した瞬間に画面上へ通知が出て、戦績画面で達成状況を一覧できる。
             さらに日替わりで、その日だけの特殊ルールが1つ全プレイに自動で適用される
             「今日のチャレンジ」がある（敵が速くなる／ジェムが増える／フィーバーが延びる等）。
@@ -774,7 +774,7 @@
             <div><b>移動だけ操作する</b>PC：WASD / 矢印キー<br />スマホ：画面をドラッグでスティック</div>
             <div><b>攻撃はオート</b>武器は勝手に撃ち続ける。武器は最大4つ＋パッシブ4つまで。最大Lvの武器は対応パッシブ所持で★進化する</div>
             <div><b>5分にボス、9分半に炎鱗竜ヴァルガロス</b>最終ボスは炎ブレス・尻尾の薙ぎ払い・突進を使ってくる。地面の警告表示から逃げよう。ボス戦でもマップは明るいまま。エリートとボスは宝箱を確定ドロップ。自分かダックスが触れると開いて、スキルを2つ選んで取得できる</div>
-            <div><b>レアな落とし物</b>敵がたまに磁石（全ジェム吸引）・爆弾（画面内の敵に大ダメージ）・肉（中回復）・回復ポーション（大回復）を落とす。さらに低確率で核爆弾（画面内の通常敵が全消滅、ボスには大ダメージ）、30秒間自動で攻撃するアシストオーブ、ごく稀にそのラン限定の最強武器「聖剣」も落ちる。ダックスも拾ってくれる</div>
+            <div><b>レアな落とし物</b>敵がたまに磁石（全ジェム吸引）・爆弾（画面内の敵に大ダメージ）・肉（中回復）・回復ポーション（大回復）を落とす。さらに低確率で核爆弾（画面内の通常敵が全消滅、ボスには大ダメージ）、30秒間自動で攻撃するアシストオーブ、経験値が即もらえる星のカプセル、ごく稀にそのラン限定の最強武器「聖剣」も落ちる。ダックスも拾ってくれる</div>
           </div>
           <div class="charwrap">
             <div class="charhead">キ ャ ラ ク タ ー</div>
@@ -1227,7 +1227,10 @@
         stat: lv => ({ dmg: 10 + 5 * (lv - 1), cd: Math.max(0.15, 0.30 - 0.024 * (lv - 1)), range: 86 + 7 * (lv - 1) }) },
       hammer: { name: "衝撃ハンマー", color: "#d6d3d1", kind: "武器",
         desc: lv => lv === 0 ? "前方にハンマーを叩きつけ、衝撃波で範囲攻撃する（ガルドの初期武器）" : "衝撃波の威力と範囲がアップ",
-        stat: lv => ({ dmg: 30 + 13 * (lv - 1), cd: Math.max(0.95, 1.7 - 0.11 * (lv - 1)), radius: 74 + 9 * (lv - 1) }) }
+        stat: lv => ({ dmg: 30 + 13 * (lv - 1), cd: Math.max(0.95, 1.7 - 0.11 * (lv - 1)), radius: 74 + 9 * (lv - 1) }) },
+      frost: { name: "フロストノヴァ", color: "#7dd3fc", kind: "武器",
+        desc: lv => lv === 0 ? "周期的に氷の衝撃波を放ち、周囲の敵を凍えさせて動きを遅くする" : "威力・範囲・凍結時間がアップ",
+        stat: lv => ({ dmg: 15 + 7 * (lv - 1), cd: Math.max(1.1, 2.1 - 0.13 * (lv - 1)), radius: 105 + 11 * (lv - 1), slow: 1.1 + 0.22 * (lv - 1) }) }
     };
     const PASSIVES = {
       power:   { name: "力の指輪",   color: "#fb4d6d", kind: "パッシブ", desc: () => "全武器のダメージ +12%" },
@@ -1243,7 +1246,9 @@
       thorns:  { name: "茨の反撃",   color: "#a3e635", kind: "パッシブ", desc: () => "接触ダメージを受けると周囲の敵へ反撃＋ノックバック" },
       crit:    { name: "会心の目",   color: "#fde047", kind: "パッシブ", desc: () => "全攻撃の会心率 +6%（会心はダメージ2倍）" },
       greed:   { name: "貪欲の壺",   color: "#fbbf24", kind: "パッシブ", desc: () => "獲得経験値 +10%" },
-      wind:    { name: "風読みの耳", color: "#a5f3fc", kind: "パッシブ", desc: () => "受ける攻撃を 4% の確率で回避する" }
+      wind:    { name: "風読みの耳", color: "#a5f3fc", kind: "パッシブ", desc: () => "受ける攻撃を 4% の確率で回避する" },
+      vamp:    { name: "吸血の牙",   color: "#e879f9", kind: "パッシブ", desc: () => "敵を倒すと 3%×Lv の確率でHPが1回復する" },
+      guard:   { name: "守護の光輪", color: "#fde68a", kind: "パッシブ", desc: () => "ダメージを1回防ぐバリアを張る（Lvで再充填が速くなる）" }
     };
     /* ---------------- 武器進化 ----------------
        条件：武器が最大Lv ＋ 対応パッシブを1つ以上所持。進化は各武器1回だけ。
@@ -1281,7 +1286,10 @@
         stat: lv => ({ dmg: 36, cd: 0.09, range: 128 }) },
       hammer:  { passive: "power",  name: "天轟ハンマー", color: "#fde68a",
         desc: "力の指輪で進化。天を轟かす一撃が広範囲を衝撃波で吹き飛ばす",
-        stat: lv => ({ dmg: 135, cd: 0.8, radius: 122 }) }
+        stat: lv => ({ dmg: 135, cd: 0.8, radius: 122 }) },
+      frost:   { passive: "wind",   name: "絶対零度",     color: "#bae6fd",
+        desc: "風読みの耳で進化。絶対零度の衝撃波が広範囲の敵を凍てつかせる",
+        stat: lv => ({ dmg: 58, cd: 0.95, radius: 185, slow: 2.6 }) }
     };
     /* 進化状態を加味した武器の表示名・色・実効ステータス */
     function wname(w) { return (w.evo && EVOLUTIONS[w.id]) ? EVOLUTIONS[w.id].name : WEAPONS[w.id].name; }
@@ -1320,7 +1328,7 @@
 
     /* ---------------- 日替わりチャレンジ ----------------
        ローカルの年月日から決まるシード（FNV-1aハッシュ）で、その日の特殊ルールを
-       6種から1つ決定的に選ぶ。同日に開けば誰でも同じルールになり、日付が変われば
+       8種から1つ決定的に選ぶ。同日に開けば誰でも同じルールになり、日付が変われば
        翌日は必ず別のルールになる。
        重複回避は「前日の最終決定ルール」と比較して行う：前日自体が回避でずれて
        いる場合があるため、前日の生ハッシュと比較すると当日と前日が一致してしまう
@@ -1337,7 +1345,9 @@
       { id: "flame",    name: "炎の夜",   color: "#fb923c", desc: "フィーバータイムが 1.5倍（10秒→15秒）に延長される", feverMul: 1.5 },
       { id: "swarm",    name: "群れの夜", color: "#f472b6", desc: "敵の出現数 +30%。そのぶんジェムの価値も +20% アップ", spawnMul: 1 / 1.3, xpMul: 1.2 },
       { id: "steel",    name: "鋼の夜",   color: "#cbd5e1", desc: "敵HP +30% と手強い夜。そのぶんスコア倍率 +50%", hpMul: 1.3, scoreMul: 1.5 },
-      { id: "heal",     name: "癒しの夜", color: "#2dd4bf", desc: "回復アイテム（回復／肉）の出現率が約3倍にアップ", healMul: 3 }
+      { id: "heal",     name: "癒しの夜", color: "#2dd4bf", desc: "回復アイテム（回復／肉）の出現率が約3倍にアップ", healMul: 3 },
+      { id: "gold",     name: "金色の夜", color: "#fbbf24", desc: "スコア倍率が2倍に跳ね上がる勝負の夜。そのぶん敵HP +20%", scoreMul: 2, hpMul: 1.2 },
+      { id: "chill",    name: "凍てつく夜", color: "#7dd3fc", desc: "敵の移動速度 -15% で動き回りやすい夜。経験値も +20%", spdMul: 0.85, xpMul: 1.2 }
     ];
     function dailyHash(str) {
       let h = 0x811c9dc5;
@@ -1423,17 +1433,20 @@
       weapon: [
         { name: "魔力の杖",   stat: "dmgPct",  base: 0.06 },
         { name: "疾風の短剣", stat: "cdPct",   base: 0.04 },
-        { name: "会心の弓",   stat: "critPct", base: 0.04 }
+        { name: "会心の弓",   stat: "critPct", base: 0.04 },
+        { name: "太陽の剣",   stat: "dmgPct",  base: 0.07 }
       ],
       armor: [
         { name: "鉄壁の鎧",   stat: "hpFlat",    base: 22 },
         { name: "癒しのローブ", stat: "regenFlat", base: 0.3 },
-        { name: "守護の大盾", stat: "armorFlat", base: 1.5 }
+        { name: "守護の大盾", stat: "armorFlat", base: 1.5 },
+        { name: "氷壁の鎧",   stat: "armorFlat", base: 1.5 }
       ],
       acc: [
         { name: "俊足のペンダント", stat: "spdPct", base: 0.05 },
         { name: "引力の指輪",       stat: "magPct", base: 0.18 },
-        { name: "叡智のお守り",     stat: "xpPct",  base: 0.08 }
+        { name: "叡智のお守り",     stat: "xpPct",  base: 0.08 },
+        { name: "星詠みの羅針盤",   stat: "xpPct",  base: 0.09 }
       ]
     };
     let gearDataCache = null;
@@ -1630,11 +1643,13 @@
         hp: cc.hp + (GB.hpFlat || 0), maxHp: cc.hp + (GB.hpFlat || 0), alive: true,
         baseSpeed: cc.speed * (1 + (GB.spdPct || 0)), face: 1, moveAng: -Math.PI / 2, moving: false, back: false,
         invuln: 0, walkPh: 0, stepDist: 0, thornT: 0,
+        /* 守護の光輪のバリア：shield=1 で展開中、shieldT は再充填までの残り秒数 */
+        shield: 0, shieldT: 0,
         /* 協力プレイ用：力尽きた状態（蘇生待ち）と蘇生ゲージ。ソロでは使わない */
         downed: false, reviveP: 0,
         /* 協力プレイ（ゲスト側描画）用：スナップショットの目標位置 */
         tx: 0, ty: 0,
-        runBuffs: { dmg: 0, spd: 0, mag: 0 },
+        runBuffs: { dmg: 0, spd: 0, mag: 0, reg: 0 },
         color: idx === 0 ? cc.color : PLAYER_COLORS[idx % PLAYER_COLORS.length],
         weapons: [],           // {id, lv, t}
         passives: {},          // id -> lv
@@ -1656,7 +1671,7 @@
         speed: p.baseSpeed * (1 + 0.08 * pv("boots")) * (1 + 0.03 * RB.spd) * (G.buffs && G.buffs.spdT > 0 ? 1.3 : 1) * (G.feverT > 0 ? 1.15 : 1),
         areaMul: 1 + 0.12 * pv("scope"),
         magnetR: 92 * (1 + 0.45 * pv("magnet") + 0.35 * pv("vacuum")) * (1 + (GB.magPct || 0)) * (1 + 0.15 * RB.mag),
-        regen: 0.8 * pv("regen") + 1.4 * pv("vital") + (GB.regenFlat || 0),
+        regen: 0.8 * pv("regen") + 1.4 * pv("vital") + (GB.regenFlat || 0) + 0.35 * (RB.reg || 0),
         armor: 2 * pv("armor") + (GB.armorFlat || 0),
         thorns: pv("thorns")
       };
@@ -1678,7 +1693,7 @@
       G.waveIdx = 0; G.wavePending = -1; G.waveLeft = 0;
       G.cleared = false; G.endless = false; G.endlessStartKills = 0; G.endlessBossT = 150; G.endlessWaveT = 120; G.endlessWaveFire = -1;
       G.manualEnd = false;
-      G.bossKills = 0; G.bonusScore = 0; G.dragonCycle = 0; G.endlessBossN = 0;
+      G.bossKills = 0; G.bonusScore = 0; G.dragonCycle = 0; G.endlessBossN = 0; G.evoCount = 0;
       const eh = document.getElementById("endlessHud"); if (eh) eh.classList.remove("on");
       G.players = [];
       const roster = (G.coop && G.coopRoster && G.coopRoster.length) ? G.coopRoster : [G.character];
@@ -1851,7 +1866,7 @@
         r: def.r * (elite ? 1.75 : 1) * rand(0.92, 1.08),
         dmg: def.dmg * (elite ? 1.5 : 1), xp: elite ? 20 : def.xp,
         elite: !!elite, boss: isBossKind,
-        flash: 0, kx: 0, ky: 0, touchT: 0, orbitT: 0, ph: rand(0, TAU), dead: false,
+        flash: 0, kx: 0, ky: 0, touchT: 0, orbitT: 0, slowT: 0, ph: rand(0, TAU), dead: false,
         fuse: -1, mode: "chase", modeT: 0, chX: 0, chY: 0, face: 1, wave: false,
         /* ドラゴン専用：向き／攻撃クールダウン／予告の照準と突進距離／怒りフラグ */
         ang: -Math.PI / 2, atkT: 2.4, teleAng: 0, teleLen: 0, enraged: false
@@ -2191,6 +2206,8 @@
     }
 
     /* ---------------- ダメージ処理 ---------------- */
+    /* 凍結（フロストノヴァ）の移動速度係数：凍っている間は全種の移動が鈍る */
+    function slowF(e) { return (e.slowT > 0) ? 0.45 : 1; }
     function damageEnemy(e, dmg, kx, ky, crit) {
       if (e.dead) return;
       /* 会心（パッシブ「会心の目」＋装備の会心率）：発生したらダメージ2倍 */
@@ -2228,6 +2245,15 @@
     function killEnemy(e) {
       e.dead = true; G.kills++;
       if (G.baseKills + G.kills >= 1000) unlockAch("kills1000");
+      if (G.baseKills + G.kills >= 5000) unlockAch("kills5000");
+      /* 吸血の牙：撃破のたびに確率でHPが少し戻る（判定は会心と同じく先頭プレイヤー基準） */
+      const pv0 = G.players[0];
+      if (pv0 && pv0.alive && !pv0.downed && (pv0.passives.vamp || 0) > 0 && pv0.hp < pv0.maxHp) {
+        if (Math.random() < 0.03 * pv0.passives.vamp) {
+          pv0.hp = Math.min(pv0.maxHp, pv0.hp + 1);
+          addFloat(pv0.x, pv0.y - 30, "吸血 +1", "#f0abfc", 12);
+        }
+      }
       addCombo();
       if (e.wave) {
         G.waveLeft--;
@@ -2272,22 +2298,23 @@
         if (Math.random() < 0.5) G.items.push({ kind: "heal", x: e.x + rand(-16, 16), y: e.y + rand(-16, 16), r: 11 });
       } else {
         dropGem(e.x, e.y, e.xp);
-        /* 低確率ピックアップ（通常 合計 約5%）：回復 1.2% / 磁石 0.7% / 爆弾 0.7% / 肉 0.8%
-           ＋ 核爆弾 0.5% / アシストオーブ 0.8% / 聖剣 0.3%（聖剣は未所持の時だけ落ちる）
+        /* 低確率ピックアップ（通常 合計 約5.6%）：回復 1.2% / 磁石 0.7% / 爆弾 0.7% / 肉 0.8%
+           ＋ 核爆弾 0.5% / アシストオーブ 0.8% / 星のカプセル 0.6% / 聖剣 0.3%（聖剣は未所持の時だけ落ちる）
            癒しの夜は回復と肉の確率だけが healMul 倍（約3倍）になる */
         const healMul = chalCfg().healMul || 1;
         const pHeal = 0.012 * healMul, pMag = 0.007, pBomb = 0.007, pMeat = 0.008 * healMul;
-        const pNuke = 0.005, pAssist = 0.008;
+        const pNuke = 0.005, pAssist = 0.008, pStar = 0.006;
         const pHoly = (G.players[0] && !G.players[0].holy) ? 0.003 : 0;
         const roll = Math.random();
-        const c1 = pHeal, c2 = c1 + pMag, c3 = c2 + pBomb, c4 = c3 + pMeat, c5 = c4 + pNuke, c6 = c5 + pAssist, c7 = c6 + pHoly;
+        const c1 = pHeal, c2 = c1 + pMag, c3 = c2 + pBomb, c4 = c3 + pMeat, c5 = c4 + pNuke, c6 = c5 + pAssist, c7 = c6 + pStar, c8 = c7 + pHoly;
         if (roll < c1) G.items.push({ kind: "heal", x: e.x, y: e.y, r: 11 });
         else if (roll < c2) G.items.push({ kind: "magnet", x: e.x, y: e.y, r: 11 });
         else if (roll < c3) G.items.push({ kind: "bomb", x: e.x, y: e.y, r: 11 });
         else if (roll < c4) G.items.push({ kind: "meat", x: e.x, y: e.y, r: 11 });
         else if (roll < c5) G.items.push({ kind: "nuke", x: e.x, y: e.y, r: 11 });
         else if (roll < c6) G.items.push({ kind: "assist", x: e.x, y: e.y, r: 11 });
-        else if (roll < c7) G.items.push({ kind: "holy", x: e.x, y: e.y, r: 11 });
+        else if (roll < c7) G.items.push({ kind: "star", x: e.x, y: e.y, r: 11 });
+        else if (roll < c8) G.items.push({ kind: "holy", x: e.x, y: e.y, r: 11 });
       }
     }
     function hurtPlayer(p, dmg, contact) {
@@ -2298,6 +2325,17 @@
         addFloat(p.x, p.y - 26, "回避！", "#a5f3fc", 15);
         p.invuln = 0.45;
         beep(920, 0.07, "sine", 0.03, 300);
+        return;
+      }
+      /* 守護の光輪：バリアが張ってあれば、この1回だけダメージを無効化してバリアを消費する */
+      if ((p.passives.guard || 0) > 0 && p.shield > 0) {
+        p.shield = 0;
+        p.shieldT = Math.max(6, 15 - 1.3 * p.passives.guard);
+        p.invuln = 0.6;
+        addFloat(p.x, p.y - 30, "バリアで防いだ！", "#fde68a", 15);
+        G.rings.push({ x: p.x, y: p.y, t: 0, life: 0.35, maxR: 64, color: "#fde68a" });
+        spawnParts(p.x, p.y, "#fde68a", 10, 120);
+        beep(1240, 0.1, "sine", 0.045, 320);
         return;
       }
       const real = Math.max(1, dmg - eff(p).armor);
@@ -2366,8 +2404,8 @@
       if (e.mode === "chase") {
         turnToward(e, toPlayer, 1.7, dt);
         if (td > 190) {
-          e.x += (Math.cos(e.ang) * e.spd * 1.15 + e.kx) * dt;
-          e.y += (Math.sin(e.ang) * e.spd * 1.15 + e.ky) * dt;
+          e.x += (Math.cos(e.ang) * e.spd * 1.15 * slowF(e) + e.kx) * dt;
+          e.y += (Math.sin(e.ang) * e.spd * 1.15 * slowF(e) + e.ky) * dt;
         } else { e.x += e.kx * dt; e.y += e.ky * dt; }
         e.atkT -= dt;
         if (e.atkT <= 0) {
@@ -2701,6 +2739,23 @@
           damageEnemy(tgt, st.dmg * E.dmgMul * rand(0.9, 1.15), 0, 0, Math.random() < 0.15);
         }
         w.t = st.cd * E.cdMul; beep(1180, 0.09, "sawtooth", 0.03, -500);
+      } else if (w.id === "frost") {
+        /* フロストノヴァ：自分の周囲へ氷の衝撃波。ダメージ＋凍結（移動速度低下）を与える */
+        const R = st.radius * E.areaMul;
+        G.rings.push({ x: p.x, y: p.y, t: 0, life: 0.38, maxR: R + 20, color: wcolor(w) });
+        G.rings.push({ x: p.x, y: p.y, t: 0, life: 0.26, maxR: R * 0.6, color: "#e0f2fe" });
+        spawnParts(p.x, p.y, "#7dd3fc", 16, 190); spawnParts(p.x, p.y, "#e0f2fe", 8, 140);
+        for (const e of G.enemies) {
+          if (e.dead) continue;
+          if (dist2(p.x, p.y, e.x, e.y) < Math.pow(R + e.r, 2)) {
+            const ka = Math.atan2(e.y - p.y, e.x - p.x);
+            const kb = e.boss ? 24 : 130;
+            damageEnemy(e, st.dmg * E.dmgMul, Math.cos(ka) * kb, Math.sin(ka) * kb, Math.random() < 0.08);
+            if (!e.dead) e.slowT = Math.max(e.slowT || 0, e.boss ? st.slow * 0.4 : st.slow);
+          }
+        }
+        w.t = st.cd * E.cdMul;
+        beep(1560, 0.14, "triangle", 0.04, -700);
       } else if (w.id === "twin") {
         /* 双剣の連舞：近くの敵へ自動で向き、前方を左右交互に高速で斬る近接攻撃。斬撃エフェクトは G.slashes へ */
         p.slashAlt = !p.slashAlt;
@@ -2773,6 +2828,7 @@
       /* 実績：無傷3分／無限モード+5分（unlockAch は冪等なので毎フレーム呼んでも安全） */
       if (!G.tookDamage && G.time >= 180) unlockAch("nodmg180");
       if (G.endless && G.time - RUN_TIME >= 300) unlockAch("endless5");
+      if (G.endless && G.time - RUN_TIME >= 600) unlockAch("endless10");
       /* 10分到達：即リザルトではなく「終了 or 無限モード」の選択シートへ（無限モード中は素通り） */
       if (!G.endless && G.time >= RUN_TIME) { winClear(); return; }
       director(dt);
@@ -2815,6 +2871,15 @@
         if (p.invuln > 0) p.invuln -= dt;
         if (p.thornT > 0) p.thornT -= dt;
         if (E.regen > 0) p.hp = Math.min(p.maxHp, p.hp + E.regen * dt);
+        /* 守護の光輪：消費したバリアは時間で再充填される（満タンで金の輪が戻る） */
+        if ((p.passives.guard || 0) > 0 && p.shield <= 0) {
+          p.shieldT -= dt;
+          if (p.shieldT <= 0) {
+            p.shield = 1;
+            G.rings.push({ x: p.x, y: p.y, t: 0, life: 0.3, maxR: 52, color: "#fde68a" });
+            beep(1560, 0.07, "sine", 0.025, 200);
+          }
+        }
         for (const w of p.weapons) fireWeapon(p, w, dt);
         updateOrbit(p, dt);
       }
@@ -2863,6 +2928,7 @@
         if (e.flash > 0) e.flash -= dt;
         if (e.touchT > 0) e.touchT -= dt;
         if (e.orbitT > 0) e.orbitT -= dt;
+        if (e.slowT > 0) e.slowT -= dt;
         const tgt = nearestPlayer(e.x, e.y);
         if (tgt) {
           const tdx = tgt.x - e.x, tdy = tgt.y - e.y, td = Math.hypot(tdx, tdy) || 1;
@@ -2877,15 +2943,15 @@
             } else {
               e.ang = Math.atan2(tdy, tdx);
               if (tdx > 2) e.face = 1; else if (tdx < -2) e.face = -1;
-              e.x += (tdx / td * e.spd + e.kx) * dt;
-              e.y += (tdy / td * e.spd + e.ky) * dt;
+              e.x += (tdx / td * e.spd * slowF(e) + e.kx) * dt;
+              e.y += (tdy / td * e.spd * slowF(e) + e.ky) * dt;
             }
           } else if (e.type === "boar") {
             /* 突進イノシシ：接近→溜め→直線突進→硬直 のステートマシン */
             e.modeT -= dt;
             if (e.mode === "chase") {
-              e.x += (tdx / td * e.spd + e.kx) * dt;
-              e.y += (tdy / td * e.spd + e.ky) * dt;
+              e.x += (tdx / td * e.spd * slowF(e) + e.kx) * dt;
+              e.y += (tdy / td * e.spd * slowF(e) + e.ky) * dt;
               if (tdx !== 0) e.face = tdx > 0 ? 1 : -1;
               if (td < 255) { e.mode = "windup"; e.modeT = 0.45; }
             } else if (e.mode === "windup") {
@@ -2897,8 +2963,8 @@
                 beep(220, 0.1, "sawtooth", 0.045, 160);
               }
             } else if (e.mode === "charge") {
-              e.x += (e.chX * 545 * spdMulTotal() + e.kx) * dt;
-              e.y += (e.chY * 545 * spdMulTotal() + e.ky) * dt;
+              e.x += (e.chX * 545 * spdMulTotal() * slowF(e) + e.kx) * dt;
+              e.y += (e.chY * 545 * spdMulTotal() * slowF(e) + e.ky) * dt;
               if (Math.random() < 0.55) spawnParts(e.x - e.chX * e.r, e.y - e.chY * e.r + 8, "#a8a29e", 1, 40);
               if (e.modeT <= 0) { e.mode = "stun"; e.modeT = 0.75; }
             } else { /* stun：突進後の硬直 */
@@ -2913,8 +2979,8 @@
             if (e.type === "bat") a += Math.sin(G.time * 6 + e.ph) * 0.55;
             e.ang = a;
             if (Math.cos(a) > 0.25) e.face = 1; else if (Math.cos(a) < -0.25) e.face = -1;
-            e.x += (Math.cos(a) * e.spd + e.kx) * dt;
-            e.y += (Math.sin(a) * e.spd + e.ky) * dt;
+            e.x += (Math.cos(a) * e.spd * slowF(e) + e.kx) * dt;
+            e.y += (Math.sin(a) * e.spd * slowF(e) + e.ky) * dt;
           }
           if (!e.dead && dist2(e.x, e.y, tgt.x, tgt.y) < Math.pow(e.r + tgt.r - 2, 2) && e.touchT <= 0) {
             e.touchT = 0.55;
@@ -3061,6 +3127,13 @@
           spawnParts(p.x, p.y, "#c084fc", 14, 130);
           beep(880, 0.14, "sine", 0.05, 440); setTimeout(() => beep(1320, 0.16, "sine", 0.045, 300), 80);
           syncBuffHud();
+        } else if (it.kind === "star") {
+          /* 星のカプセル：即座に経験値を得る（レベルアップの呼び水になる） */
+          gainXp(25);
+          addFloat(p.x, p.y - 30, "星のカプセル！ 経験値+25", "#fde047", 16);
+          G.rings.push({ x: p.x, y: p.y, t: 0, life: 0.35, maxR: 70, color: "#fde047" });
+          spawnParts(p.x, p.y, "#fde047", 12, 130); spawnParts(p.x, p.y, "#ffffff", 5, 100);
+          beep(1568, 0.12, "sine", 0.05, 500); setTimeout(() => beep(2093, 0.14, "sine", 0.045, 300), 70);
         } else if (it.kind === "holy") {
           /* 聖剣：このランの間だけ使える最強武器 */
           p.holy = true;
@@ -3352,7 +3425,8 @@
         bomb:   { glow: "#fb923c", disc: "#1c1917", ring: "rgba(251,146,60,.55)" },
         nuke:   { glow: "#facc15", disc: "#292524", ring: "rgba(250,204,21,.7)" },
         assist: { glow: "#c084fc", disc: "#2e1065", ring: "rgba(216,180,254,.6)" },
-        holy:   { glow: "#fde68a", disc: "#451a03", ring: "rgba(253,230,138,.75)" }
+        holy:   { glow: "#fde68a", disc: "#451a03", ring: "rgba(253,230,138,.75)" },
+        star:   { glow: "#fde047", disc: "#422006", ring: "rgba(253,224,71,.6)" }
       };
       for (const it of G.items) {
         const st = ITEM_STYLE[it.kind] || ITEM_STYLE.heal;
@@ -3447,6 +3521,21 @@
           ctx.moveTo(0, -13); ctx.lineTo(2.6, -3); ctx.lineTo(1.1, 5); ctx.lineTo(-1.1, 5); ctx.lineTo(-2.6, -3); ctx.closePath(); ctx.fill();
           ctx.fillStyle = "#b45309"; ctx.fillRect(-6.4, 5, 12.8, 2.8);
           ctx.fillStyle = "#fbbf24"; ctx.beginPath(); ctx.arc(0, 9.6, 2.2, 0, TAU); ctx.fill();
+          ctx.restore();
+        } else if (it.kind === "star") {
+          /* 星のカプセル：金色の星がゆっくり傾く */
+          ctx.save(); ctx.translate(sx, sy); ctx.rotate(Math.sin(G.time * 2.6) * 0.35);
+          const sg2 = ctx.createLinearGradient(0, -9, 0, 9);
+          sg2.addColorStop(0, "#fef9c3"); sg2.addColorStop(0.5, "#fde047"); sg2.addColorStop(1, "#f59e0b");
+          ctx.fillStyle = sg2;
+          ctx.beginPath();
+          for (let i = 0; i < 10; i++) {
+            const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 === 0 ? 9 : 4;
+            const px2 = Math.cos(a) * rr, py2 = Math.sin(a) * rr;
+            if (i === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+          }
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 1; ctx.stroke();
           ctx.restore();
         }
       }
@@ -3716,6 +3805,7 @@
         if (it.kind === "holy") dot(it.x, it.y, 4.2, "#fde68a");
         else if (it.kind === "nuke") dot(it.x, it.y, 4.2, "#facc15");
         else if (it.kind === "assist") dot(it.x, it.y, 3.6, "#d8b4fe");
+        else if (it.kind === "star") dot(it.x, it.y, 3.6, "#fde047");
       }
       for (const ch of G.chests) if (!ch.got) dot(ch.x, ch.y, 4.6, "#fbbf24");
       for (const e of G.enemies) {
@@ -3779,6 +3869,16 @@
       if (p.downed) ctx.globalAlpha = 0.8;
       /* 影（柔らかい楕円グラデーション） */
       drawShadow(sx, sy + 15, 38);
+      /* 守護の光輪：バリア展開中は淡い金の二重の輪を足元に表示する */
+      if (p.shield > 0) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(253,230,138," + (0.5 + Math.sin(G.time * 4) * 0.18).toFixed(2) + ")";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(sx, sy + 2, 30 + Math.sin(G.time * 4) * 2, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = "rgba(253,230,138,.18)";
+        ctx.beginPath(); ctx.arc(sx, sy + 2, 36 + Math.sin(G.time * 4 + 1) * 2, 0, TAU); ctx.stroke();
+        ctx.restore();
+      }
       /* イラスト素材が読めていればスプライトで描く（足元アンカー＋向きで左右反転。
          上へ移動中は背面版スプライトに切り替えて後ろ姿で見せる） */
       const useBack = p.back && spriteReady(SPR_BACK[p.charId]);
@@ -4245,6 +4345,21 @@
         ctx.beginPath(); ctx.arc(sx - e.r * 0.3, sy, 2.3, 0, TAU); ctx.fill();
         ctx.beginPath(); ctx.arc(sx + e.r * 0.3, sy, 2.3, 0, TAU); ctx.fill();
       }
+      /* 凍結中：氷の膜と結晶で覆って、鈍足がひと目で分かるようにする */
+      if (e.slowT > 0) {
+        ctx.fillStyle = "rgba(125,211,252,.30)";
+        ctx.beginPath(); ctx.arc(sx, sy, e.r * 1.12, 0, TAU); ctx.fill();
+        ctx.strokeStyle = "rgba(186,230,253,.75)"; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.arc(sx, sy, e.r * 1.12, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = "rgba(224,242,254,.85)"; ctx.lineWidth = 1.2;
+        for (let i = 0; i < 3; i++) {
+          const ia = e.ph + i * 2.1, ix = sx + Math.cos(ia) * e.r * 0.55, iy = sy + Math.sin(ia) * e.r * 0.55;
+          ctx.beginPath();
+          ctx.moveTo(ix - 3.4, iy); ctx.lineTo(ix + 3.4, iy);
+          ctx.moveTo(ix, iy - 3.4); ctx.lineTo(ix, iy + 3.4);
+          ctx.stroke();
+        }
+      }
       if (e.elite) {
         ctx.strokeStyle = "#fb4d6d"; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(sx, sy, e.r + 5 + Math.sin(G.time * 5) * 1.6, 0, TAU); ctx.stroke();
@@ -4313,7 +4428,8 @@
       atk: { name: "攻撃の心得", color: "#fb4d6d", ds: "全武器のダメージ +4%（このラン中、重ねがけ可）" },
       spd: { name: "疾走の心得", color: "#7dd3fc", ds: "移動速度 +3%（このラン中、重ねがけ可）" },
       vit: { name: "活力の心得", color: "#fda4af", ds: "最大HP +15、その場で15回復" },
-      mag: { name: "引力の心得", color: "#5eead4", ds: "ジェム吸引範囲 +15%（このラン中、重ねがけ可）" }
+      mag: { name: "引力の心得", color: "#5eead4", ds: "ジェム吸引範囲 +15%（このラン中、重ねがけ可）" },
+      reg: { name: "回復の心得", color: "#4ade80", ds: "HP回復速度 +0.35/秒（このラン中、重ねがけ可）" }
     };
     function buildChoices(p) {
       const pool = [];
@@ -4413,6 +4529,8 @@
         if (w) {
           w.evo = true;
           unlockAch("evolve_first");
+          G.evoCount = (G.evoCount || 0) + 1;
+          if (G.evoCount >= 2) unlockAch("evolve2");
           addFloat(p.x, p.y - 50, "★ EVOLUTION ★", "#fbbf24", 22);
           G.rings.push({ x: p.x, y: p.y, t: 0, life: 0.5, maxR: 135, color: "#fbbf24" });
           G.rings.push({ x: p.x, y: p.y, t: 0, life: 0.34, maxR: 70, color: "#ffffff" });
@@ -4437,11 +4555,13 @@
         if (c.id === "atk") p.runBuffs.dmg++;
         else if (c.id === "spd") p.runBuffs.spd++;
         else if (c.id === "mag") p.runBuffs.mag++;
+        else if (c.id === "reg") p.runBuffs.reg = (p.runBuffs.reg || 0) + 1;
         else if (c.id === "vit") { p.maxHp += 15; p.hp = Math.min(p.maxHp, p.hp + 15); }
       }
       else if (c.cat === "passiveNew" || c.cat === "passiveUp") {
         p.passives[c.id] = (p.passives[c.id] || 0) + 1;
         if (c.id === "heart") { p.maxHp += 25; p.hp = Math.min(p.maxHp, p.hp + 25); }
+        if (c.id === "guard") p.shield = 1; /* 取得した瞬間からバリア展開 */
       } else if (c.cat === "heal") p.hp = Math.min(p.maxHp, p.hp + 50);
     }
     function chooseCard(c) {
@@ -4546,7 +4666,7 @@
       saveStats(s);
     }
     /* ---------------- 実績（アチーブメント） ----------------
-       全13個。達成状態はベスト記録・戦績とは別キーで localStorage に保存し、
+       全18個。達成状態はベスト記録・戦績とは別キーで localStorage に保存し、
        戦績リセットでも消えない。判定は既存イベントへのフックのみで、
        ゲーム本体の挙動・バランスには一切影響しない。
        unlockAch は冪等（二重判定しても再表示・再保存しない）で、
@@ -4565,7 +4685,12 @@
       { id: "endless5",     name: "終わらない夜",   desc: "無限モードでさらに5分戦い抜いた", cond: "無限モードで追加5分（合計15分）生存する" },
       { id: "plays10",      name: "夜の常連",       desc: "夜に10回も通った常連さん", cond: "累計プレイ回数が10回に到達する" },
       { id: "nodmg180",     name: "無傷の舞踏",     desc: "傷ひとつなく3分間を踊り切った", cond: "ダメージを受けずに3分間生存する" },
-      { id: "dragon_slayer", name: "竜殺し",       desc: "炎鱗竜ヴァルガロスを討ち倒した", cond: "9分半に現れる炎鱗竜ヴァルガロスを討伐する" }
+      { id: "dragon_slayer", name: "竜殺し",       desc: "炎鱗竜ヴァルガロスを討ち倒した", cond: "9分半に現れる炎鱗竜ヴァルガロスを討伐する" },
+      { id: "akari_clear",  name: "双剣の夜明け", desc: "踊り子アカリで夜明けを迎えた", cond: "アカリでクリアする" },
+      { id: "gald_clear",   name: "重騎士の夜明け", desc: "重騎士ガルドで夜明けを迎えた", cond: "ガルドでクリアする" },
+      { id: "kills5000",    name: "万の骸",       desc: "魔物を累計5000体も倒した", cond: "累計撃破数が5,000に到達する" },
+      { id: "evolve2",      name: "二重進化",     desc: "1回のプレイで武器を2つも★進化させた", cond: "1回のプレイで武器を2回★進化させる" },
+      { id: "endless10",    name: "夜の果て",     desc: "無限モードでさらに10分戦い抜いた", cond: "無限モードで追加10分（合計20分）生存する" }
     ];
     function loadAch() {
       try { const a = JSON.parse(localStorage.getItem(ACH_KEY)); if (a && typeof a === "object") return a; } catch (e) {}
@@ -4616,6 +4741,7 @@
       if (s.clears >= 1) unlockAch("first_clear");
       if (s.plays >= 10) unlockAch("plays10");
       if (s.kills >= 1000) unlockAch("kills1000");
+      if (s.kills >= 5000) unlockAch("kills5000");
       if (s.chests >= 10) unlockAch("chests10");
       if (s.maxCombo >= 300) unlockAch("combo300");
     }
@@ -4824,6 +4950,8 @@
       /* クリア系の実績は10分到達したこの瞬間に判定する（無限モードに進んでも達成済みになる） */
       unlockAch("first_clear");
       if (G.character === "kai") unlockAch("kai_clear");
+      if (G.character === "akari") unlockAch("akari_clear");
+      if (G.character === "gald") unlockAch("gald_clear");
       if (G.difficulty === "chaos") unlockAch("chaos_clear");
       if (window.__coop) window.__coop.onClear();
     }
@@ -4923,6 +5051,8 @@
       if (isClear) {
         unlockAch("first_clear");
         if (G.character === "kai") unlockAch("kai_clear");
+        if (G.character === "akari") unlockAch("akari_clear");
+        if (G.character === "gald") unlockAch("gald_clear");
         if (G.difficulty === "chaos") unlockAch("chaos_clear");
       }
       el("bestScore").textContent = "今回 " + score.toLocaleString("ja-JP") + " ／ ベスト " + Math.max(prevScore, score).toLocaleString("ja-JP");
@@ -4986,7 +5116,7 @@
           waveIdx: G.waveIdx, wavePending: G.wavePending, waveLeft: G.waveLeft,
           cleared: G.cleared, endless: G.endless, endlessStartKills: G.endlessStartKills,
           endlessBossT: G.endlessBossT, endlessWaveT: G.endlessWaveT, endlessWaveFire: G.endlessWaveFire,
-          bossKills: G.bossKills, bonusScore: G.bonusScore, dragonCycle: G.dragonCycle, endlessBossN: G.endlessBossN,
+          bossKills: G.bossKills, bonusScore: G.bonusScore, dragonCycle: G.dragonCycle, endlessBossN: G.endlessBossN, evoCount: G.evoCount || 0,
           uidSeq: G.uidSeq, bossUid: G.boss ? G.boss.uid : 0,
           players: G.players, enemies: G.enemies,
           gems: G.gems, items: G.items, chests: G.chests, dog: G.dog
@@ -5048,7 +5178,7 @@
       G.cleared = !!d.cleared; G.endless = !!d.endless; G.endlessStartKills = d.endlessStartKills || 0;
       G.endlessBossT = d.endlessBossT || 150; G.endlessWaveT = d.endlessWaveT || 120;
       G.endlessWaveFire = (typeof d.endlessWaveFire === "number") ? d.endlessWaveFire : -1;
-      G.bossKills = d.bossKills || 0; G.bonusScore = d.bonusScore || 0;
+      G.bossKills = d.bossKills || 0; G.bonusScore = d.bonusScore || 0; G.evoCount = d.evoCount || 0;
       G.dragonCycle = d.dragonCycle || 0; G.endlessBossN = d.endlessBossN || 0;
       G.uidSeq = d.uidSeq || 0;
       G.players = d.players;
