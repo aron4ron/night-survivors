@@ -527,6 +527,14 @@
       .newrec.on { display: inline-block; animation: recPulse 1s ease-in-out infinite; }
       @keyframes recPulse { 50% { transform: scale(1.09); } }
       @media (prefers-reduced-motion: reduce) { .newrec.on { animation: none; } }
+      /* スコアランキング／協力メンバー成績の行 */
+      .rankrow { display: flex; align-items: baseline; gap: 8px; font-size: 13.5px; padding: 4px 6px; border-radius: 6px; }
+      .rankrow + .rankrow { border-top: 1px solid rgba(148,163,216,.12); }
+      .rankrow .rk { flex: none; width: 2.6em; font-weight: 800; color: var(--amber); letter-spacing: .04em; }
+      .rankrow .rwho { flex: none; max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+      .rankrow .rdet { flex: 1; min-width: 0; color: var(--sub); font-size: 12px; letter-spacing: .03em; }
+      .rankrow .rscore { flex: none; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }
+      .rankrow.me { background: rgba(255,176,32,.13); }
       /* タイトル画面のベスト表示 */
       .titlebest { margin: 14px auto 0; font-size: 13.5px; color: var(--amber); letter-spacing: .05em; line-height: 1.7; }
       /* ---------- 戦績シート（累計記録） ---------- */
@@ -640,6 +648,16 @@
       .card.awaken .kind { color: #d8b4fe; font-weight: 700; }
       .card.awaken .lvch { color: #d8b4fe; }
       .card.stat .kind { color: var(--teal); }
+      /* ---------- ニックネーム ---------- */
+      .nickwrap { margin: 16px 0 2px; text-align: left; }
+      .nickrow { display: flex; justify-content: center; }
+      #nickInput {
+        flex: 1; max-width: 420px; min-width: 0; pointer-events: auto;
+        background: var(--panel2); color: var(--ink); border: 2px solid var(--line); border-radius: 12px;
+        font-family: "DotGothic16", sans-serif; font-size: 17px; text-align: center;
+        padding: 11px 10px; outline: none;
+      }
+      #nickInput:focus { border-color: var(--amber); }
       /* ---------- 協力プレイ（オンライン） ---------- */
       .coopwrap { margin: 16px 0 2px; text-align: left; }
       .cooprow { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -806,6 +824,13 @@
               <button class="diffbtn" data-diff="chaos" type="button"><span class="dn dot">カオス</span><span class="dd">出現頻度大幅アップ＋敵HP約1.8倍＋敵が少し速い</span><span class="dm">スコア ×2.5</span></button>
             </div>
           </div>
+          <div class="nickwrap">
+            <div class="diffhead">ニ ッ ク ネ ー ム</div>
+            <div class="nickrow">
+              <input id="nickInput" type="text" maxlength="10" placeholder="名前を入力（10文字まで）" autocomplete="off" aria-label="ニックネーム" />
+            </div>
+            <p class="note" style="text-align:center;margin-top:8px">協力プレイで仲間に表示される名前です。リザルト画面とスコアランキングにもこの名前で載ります（この端末に保存されます）。</p>
+          </div>
           <div class="coopwrap">
             <div class="diffhead">協 力 プ レ イ（オンライン・最大4人）</div>
             <div class="cooprow">
@@ -889,6 +914,7 @@
           <p class="tagline" id="resultMsg"></p>
           <div><span class="resultdiff" id="resultDiff">難易度：ノーマル</span></div>
           <div style="margin-top:6px"><span class="resultdiff" id="resultChar" style="color:var(--teal)">キャラ：ミント（魔法使い）</span></div>
+          <div style="margin-top:6px"><span class="resultdiff" id="resultPlayer" style="color:var(--amber);display:none"></span></div>
           <div class="scorewrap">
             <div class="scorelabel">SCORE</div>
             <div class="scorebig dot" id="stScore">0</div>
@@ -901,6 +927,10 @@
             <div><div class="v dot" id="stCombo">0</div><div class="k">最大コンボ</div></div>
             <div><div class="v dot" id="stChest">0</div><div class="k">宝箱開封</div></div>
           </div>
+          <div class="bestbox" id="coopRankBox" style="display:none">
+            <div class="besthead">協 力 メ ン バ ー の 成 績</div>
+            <div id="coopRankRows"></div>
+          </div>
           <div class="bestbox">
             <div class="besthead">自己ベストとの比較</div>
             <div class="bestrow"><span>スコア</span><b id="bestScore">―</b><span class="newrec" id="recScore">NEW RECORD!</span></div>
@@ -912,6 +942,11 @@
             <div class="bestrow"><span>スコア</span><b id="chalBestScore">―</b><span class="newrec" id="recChalScore">NEW RECORD!</span></div>
             <div class="bestrow"><span>生存時間</span><b id="chalBestTime">―</b><span class="newrec" id="recChalTime">NEW RECORD!</span></div>
             <div class="bestrow"><span>撃破数</span><b id="chalBestKill">―</b><span class="newrec" id="recChalKill">NEW RECORD!</span></div>
+          </div>
+          <div class="bestbox" id="rankBox">
+            <div class="besthead">ス コ ア ラ ン キ ン グ（この端末・TOP10）</div>
+            <div id="rankRows"></div>
+            <div class="scorebreak" id="rankNote" style="text-align:center"></div>
           </div>
           <div class="bestbox" id="gearBox">
             <div class="besthead">今回の獲得装備</div>
@@ -936,6 +971,8 @@
           <div class="recrows" id="recBests"></div>
           <div class="recsec">チ ャ レ ン ジ 別 ベ ス ト 記 録</div>
           <div class="recrows" id="recChalBests"></div>
+          <div class="recsec">ス コ ア ラ ン キ ン グ（この端末・TOP10）</div>
+          <div class="recrows" id="recRanking"></div>
           <div class="recsec">実 績 <span id="achProgress"></span></div>
           <div class="achgrid" id="achGrid"></div>
           <div style="display:flex;flex-direction:column;align-items:center;">
@@ -1432,6 +1469,41 @@
     try { const c = localStorage.getItem(CHAR_KEY); if (c && CHARACTERS[c]) selectedCharacter = c; } catch (e) {}
     function charCfg(id) { return CHARACTERS[id] || CHARACTERS.mint; }
 
+    /* ---------------- ニックネーム ----------------
+       協力プレイで仲間に見える名前。タイトル画面で設定し、この端末に保存する。
+       リザルト画面とスコアランキングにもこの名前で載る。未設定の表示は
+       「P番号＋キャラ名」にフォールバックする */
+    const NICK_KEY = "nightSurvivorsNickV1";
+    function sanitizeNickname(v) {
+      return String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, 10);
+    }
+    let myNickname = "";
+    try { myNickname = sanitizeNickname(localStorage.getItem(NICK_KEY) || ""); } catch (e) {}
+    /* 協力プレイ参加者のニックネーム（idx -> 名前）。協力レイヤーがロビー／
+       開始ペイロード／ロスター更新のたびに書き込み、頭上ラベルやリザルトで使う */
+    const PLAYER_NAMES = {};
+    PLAYER_NAMES[0] = myNickname;
+    function saveNickname(v) {
+      myNickname = sanitizeNickname(v);
+      try { localStorage.setItem(NICK_KEY, myNickname); } catch (e) {}
+      PLAYER_NAMES[0] = myNickname;
+    }
+    function memberLabel(idx, charId) {
+      const n = PLAYER_NAMES[idx];
+      if (n) return n;
+      return "P" + (idx + 1) + " " + charCfg(charId).name;
+    }
+    function escHtml(s) {
+      return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    function initNicknameUI() {
+      const inp = el("nickInput");
+      if (!inp) return;
+      inp.value = myNickname;
+      inp.addEventListener("input", () => saveNickname(inp.value));
+      inp.addEventListener("change", () => { inp.value = myNickname; });
+    }
+
     /* ---------------- 永続装備システム ----------------
        ラン終了時に到達レベルに応じた個数・レア度の装備（武器／防具／アクセサリー）が
        ランダムに手に入る。所持リストと装備中スロットは localStorage に保存し、
@@ -1664,6 +1736,9 @@
         shield: 0, shieldT: 0,
         /* 協力プレイ用：力尽きた状態（蘇生待ち）と蘇生ゲージ。ソロでは使わない */
         downed: false, reviveP: 0,
+        /* 個人成績（協力プレイのリザルト順位用）：与ダメージ合計と撃破数。
+           ダメージ発生時に ATK 経由で加算される。ソロでは自分分だけ貯まる */
+        dmg: 0, kills: 0,
         /* 協力プレイ（ゲスト側描画）用：スナップショットの目標位置 */
         tx: 0, ty: 0,
         runBuffs: { dmg: 0, spd: 0, mag: 0, reg: 0 },
@@ -2225,6 +2300,9 @@
     /* ---------------- ダメージ処理 ---------------- */
     /* 凍結（フロストノヴァ）の移動速度係数：凍っている間は全種の移動が鈍る */
     function slowF(e) { return (e.slowT > 0) ? 0.45 : 1; }
+    /* 個人成績の帰属先：武器・投射物など「誰の攻撃か」が分かる処理の間だけ
+       対象プレイヤーを入れておき、damageEnemy が与ダメと撃破をその人へ数える */
+    let ATK = null;
     function damageEnemy(e, dmg, kx, ky, crit) {
       if (e.dead) return;
       /* 会心（パッシブ「会心の目」＋装備の会心率）：発生したらダメージ2倍 */
@@ -2234,6 +2312,7 @@
         if (cc > 0 && Math.random() < cc) { dmg *= 2; crit = true; }
       }
       e.hp -= dmg; e.flash = 0.09;
+      if (ATK) { ATK.dmg += dmg; e.lastHitIdx = ATK.id; } /* 参照でなくIDで持つ（中断セーブのJSON化で膨らまないように） */
       if (kx || ky) { e.kx += kx; e.ky += ky; }
       addFloat(e.x + rand(-8, 8), e.y - e.r - 4, Math.round(dmg), crit ? "#ffd34d" : "#ffffff", crit ? 19 : 14);
       spawnParts(e.x, e.y, crit ? "#ffd34d" : "#cbd5e1", crit ? 5 : 3, 90);
@@ -2261,6 +2340,7 @@
     }
     function killEnemy(e) {
       e.dead = true; G.kills++;
+      if (typeof e.lastHitIdx === "number") { const lp = G.players.find(q => q.id === e.lastHitIdx); if (lp) lp.kills++; } /* 最後に攻撃したプレイヤーの個人撃破数 */
       if (G.baseKills + G.kills >= 1000) unlockAch("kills1000");
       if (G.baseKills + G.kills >= 5000) unlockAch("kills5000");
       /* 吸血の牙：撃破のたびに確率でHPが少し戻る（判定は会心と同じく先頭プレイヤー基準） */
@@ -2374,7 +2454,9 @@
           if (dist2(p.x, p.y, e.x, e.y) < Math.pow(R + e.r, 2)) {
             const ka = Math.atan2(e.y - p.y, e.x - p.x);
             const kb = e.boss ? 36 : 290;
+            ATK = p; /* 茨の反撃は反撃した本人へ帰属 */
             damageEnemy(e, tdmg, Math.cos(ka) * kb, Math.sin(ka) * kb, false);
+            ATK = null;
           }
         }
       }
@@ -2575,7 +2657,9 @@
           if (dist2(dog.x, dog.y, e.x, e.y) < Math.pow(104 + e.r, 2)) {
             const ka = Math.atan2(e.y - dog.y, e.x - dog.x);
             const kb = e.boss ? 30 : 300;
+            ATK = G.players[0] || null; /* ダックスの吠えは飼い主（先頭プレイヤー）へ帰属 */
             damageEnemy(e, 7, Math.cos(ka) * kb, Math.sin(ka) * kb, false);
+            ATK = null;
           }
         }
       }
@@ -2722,7 +2806,7 @@
           const tgt = nearestEnemy(p.x, p.y, 640);
           if (!tgt) break;
           const a = Math.atan2(tgt.y - p.y, tgt.x - p.x) + rand(-0.14, 0.14);
-          G.projs.push({ kind: w.id, x: p.x, y: p.y - 6, vx: Math.cos(a) * (isFlame ? 480 : 540), vy: Math.sin(a) * (isFlame ? 480 : 540), dmg: st.dmg * E.dmgMul, r: isFlame ? 7 : 6, pierce: 0, life: 1.6, target: tgt, hitSet: null, turn: isFlame ? 10.5 : 7.5, color: wcolor(w) });
+          G.projs.push({ kind: w.id, x: p.x, y: p.y - 6, vx: Math.cos(a) * (isFlame ? 480 : 540), vy: Math.sin(a) * (isFlame ? 480 : 540), dmg: st.dmg * E.dmgMul, r: isFlame ? 7 : 6, pierce: 0, life: 1.6, target: tgt, hitSet: null, turn: isFlame ? 10.5 : 7.5, ownerRef: p, color: wcolor(w) });
           fired = true;
         }
         if (fired) { w.t = st.cd * E.cdMul; SE.shoot(); }
@@ -2738,13 +2822,13 @@
       } else if (w.id === "knife") {
         for (let i = 0; i < st.count; i++) {
           const a = p.moveAng + (i - (st.count - 1) / 2) * 0.09;
-          G.projs.push({ kind: "knife", x: p.x, y: p.y - 4, vx: Math.cos(a) * 760, vy: Math.sin(a) * 760, dmg: st.dmg * E.dmgMul, r: 5, pierce: 0, life: 0.6, target: null, hitSet: null });
+          G.projs.push({ kind: "knife", x: p.x, y: p.y - 4, vx: Math.cos(a) * 760, vy: Math.sin(a) * 760, dmg: st.dmg * E.dmgMul, r: 5, pierce: 0, life: 0.6, target: null, hitSet: null, ownerRef: p });
         }
         w.t = st.cd * E.cdMul; SE.shoot();
       } else if (w.id === "axe") {
         for (let i = 0; i < st.count; i++) {
           const a = rand(0, TAU);
-          G.projs.push({ kind: "axe", x: p.x, y: p.y - 8, vx: Math.cos(a) * rand(120, 210), vy: -rand(300, 380), dmg: st.dmg * E.dmgMul, r: 13, pierce: 999, life: 1.35, spin: rand(0, TAU), hitSet: new Set(), hitCd: 0, color: wcolor(w) });
+          G.projs.push({ kind: "axe", x: p.x, y: p.y - 8, vx: Math.cos(a) * rand(120, 210), vy: -rand(300, 380), dmg: st.dmg * E.dmgMul, r: 13, pierce: 999, life: 1.35, spin: rand(0, TAU), hitSet: new Set(), hitCd: 0, ownerRef: p, color: wcolor(w) });
         }
         w.t = st.cd * E.cdMul; SE.shoot();
       } else if (w.id === "bolt") {
@@ -2897,8 +2981,10 @@
             beep(1560, 0.07, "sine", 0.025, 200);
           }
         }
+        ATK = p; /* このプレイヤーの武器・オーラ・旋回刃のダメージはこの人へ帰属 */
         for (const w of p.weapons) fireWeapon(p, w, dt);
         updateOrbit(p, dt);
+        ATK = null;
       }
 
       /* アシストオーブ（30秒の使い魔）：プレイヤーの周りを回り、近くの敵を自動で撃つ */
@@ -2915,7 +3001,9 @@
             if (tgt) {
               G.assistFireT = 0.45;
               G.bolts.push({ x: tgt.x, y: tgt.y, t: 0, life: 0.16, color: "#c084fc" });
+              ATK = p0u; /* アシストオーブは先頭プレイヤーの使い魔として帰属 */
               damageEnemy(tgt, 18 * eff(p0u).dmgMul, 0, 0, Math.random() < 0.1);
+              ATK = null;
               beep(1180, 0.06, "sine", 0.022, 260);
             } else G.assistFireT = 0.12;
           }
@@ -2929,7 +3017,7 @@
           const tgt = nearestEnemy(p.x, p.y, 640);
           if (tgt) {
             const a = Math.atan2(tgt.y - p.y, tgt.x - p.x);
-            G.projs.push({ kind: "holy", x: p.x, y: p.y - 6, vx: Math.cos(a) * 640, vy: Math.sin(a) * 640, dmg: 130 * eff(p).dmgMul, r: 27, pierce: 999, life: 1.5, spin: 0, hitSet: new Set(), color: "#fde68a" });
+            G.projs.push({ kind: "holy", x: p.x, y: p.y - 6, vx: Math.cos(a) * 640, vy: Math.sin(a) * 640, dmg: 130 * eff(p).dmgMul, r: 27, pierce: 999, life: 1.5, spin: 0, hitSet: new Set(), ownerRef: p, color: "#fde68a" });
             p.holyT = 0.85;
             beep(740, 0.1, "sawtooth", 0.03, 500);
           } else p.holyT = 0.15;
@@ -3057,7 +3145,9 @@
           if (dist2(pr.x, pr.y, e.x, e.y) < Math.pow(pr.r + e.r, 2)) {
             const ka = Math.atan2(e.y - pr.y, e.x - pr.x);
             const crit = Math.random() < 0.1;
+            ATK = pr.ownerRef || pr.owner || null; /* 投射物の持ち主へ帰属（ブーメランは owner） */
             damageEnemy(e, pr.dmg * rand(0.9, 1.12) * (crit ? 2 : 1), Math.cos(ka) * (pr.kind === "axe" ? 60 : 120), Math.sin(ka) * (pr.kind === "axe" ? 60 : 120), crit);
+            ATK = null;
             if (pr.hitSet) pr.hitSet.add(e);
             if (pr.hitTimes) pr.hitTimes.set(e, pr.age);
             if (pr.pierce > 0) pr.pierce--; else { pr.life = 0; break; }
@@ -3864,7 +3954,7 @@
       if (!G.coop) return;
       ctx.save();
       ctx.font = "700 11px sans-serif"; ctx.textAlign = "center";
-      const label = "P" + (p.id + 1) + " " + charCfg(p.charId).name;
+      const label = memberLabel(p.id, p.charId);
       const tw = ctx.measureText(label).width + 16;
       ctx.fillStyle = "rgba(7,10,20,.72)";
       ctx.beginPath(); ctx.roundRect(sx - tw / 2, topY - 11, tw, 16, 8); ctx.fill();
@@ -4647,6 +4737,48 @@
       try { localStorage.setItem(CHAL_BEST_KEY, JSON.stringify(m)); } catch (e) {}
     }
 
+    /* ---------------- スコアランキング（この端末の歴代TOP10） ----------------
+       ラン終了のたびに今回のスコアをニックネーム付きで登録し、スコア順に
+       上位10件だけ残す。リザルト画面と戦績画面で同じリストを表示する。
+       登録は endGame の確定時に1回だけ（戦績と同じく二重登録しない） */
+    const RANK_KEY = "nightSurvivorsRankingV1";
+    const RANK_MAX = 10;
+    function loadRanking() {
+      try {
+        const a = JSON.parse(localStorage.getItem(RANK_KEY));
+        if (Array.isArray(a)) return a.filter(e => e && typeof e.score === "number");
+      } catch (e) {}
+      return [];
+    }
+    /* 登録して、TOP10に入ればその順位（0始まり）、入らなければ -1 を返す */
+    function recordRanking(entry) {
+      const list = loadRanking();
+      list.push(entry);
+      list.sort((a, b) => b.score - a.score);
+      const idx = list.indexOf(entry);
+      try { localStorage.setItem(RANK_KEY, JSON.stringify(list.slice(0, RANK_MAX))); } catch (e) {}
+      return idx < RANK_MAX ? idx : -1;
+    }
+    function rankingRowHtml(e, i, hl) {
+      const d = e.at ? new Date(e.at) : null;
+      const ds = (d && !isNaN(d)) ? (d.getMonth() + 1) + "/" + d.getDate() : "";
+      const det = [charCfg(e.char).name, DIFFICULTIES[e.diff] ? DIFFICULTIES[e.diff].name : "",
+        e.coop > 1 ? "協力" + e.coop + "人" : "", ds].filter(Boolean).join("／");
+      return '<div class="rankrow' + (hl ? " me" : "") + '"><span class="rk">' + (i + 1) + '位</span>' +
+        '<span class="rwho">' + (e.name ? escHtml(e.name) : "（名無し）") + '</span>' +
+        '<span class="rdet">' + det + '</span>' +
+        '<b class="rscore">' + (e.score || 0).toLocaleString("ja-JP") + '</b></div>';
+    }
+    function renderRankingInto(elm, hlIdx) {
+      if (!elm) return;
+      const list = loadRanking();
+      if (!list.length) {
+        elm.innerHTML = '<div class="rankrow"><span class="rdet">まだ記録がありません。1回遊ぶとここに載ります</span></div>';
+        return;
+      }
+      elm.innerHTML = list.map((e, i) => rankingRowHtml(e, i, i === hlIdx)).join("");
+    }
+
     /* ---------------- 戦績（累計記録） ----------------
        ベスト記録とは別キーで生涯の通算を保存する。
        加算は endGame の確定時に1回だけ行う（endGame 自体が state ガードで
@@ -4818,6 +4950,7 @@
           ? "スコア " + b.score.toLocaleString("ja-JP") + " ／ 最長 " + fmtTime(b.time) + " ／ 撃破 " + b.kills.toLocaleString("ja-JP")
           : "記録なし") + "</b></div>";
       }).join("");
+      renderRankingInto(el("recRanking"), -1);
       /* 実績：累計条件を満たした分をここで拾ってから一覧を描く */
       checkCumulativeAchievements();
       renderAchievements();
@@ -4867,6 +5000,8 @@
       audio();
       G.difficulty = selectedDifficulty;
       G.character = selectedCharacter;
+      PLAYER_NAMES[0] = myNickname; /* 自分のニックネームを頭上ラベル／リザルト用に反映 */
+      G.coopMyIdx = G.localIdx || 0; /* このランでの自分の番号（リザルトの自分行ハイライト用） */
       /* 日替わりチャレンジ：開始時点の日のルールをこのランに固定する */
       activeChallenge = challengeForDate(new Date());
       refreshDailyUI();
@@ -5092,6 +5227,35 @@
       countUp(el("stLv"), G.level, 700);
       countUp(el("stCombo"), G.maxCombo, 900);
       countUp(el("stChest"), G.chestsOpened, 700);
+      /* プレイヤー名（ニックネーム）：設定されていればリザルトに表示する */
+      const rp = el("resultPlayer");
+      if (rp) {
+        if (myNickname) { rp.style.display = ""; rp.textContent = "プレイヤー：" + myNickname; }
+        else rp.style.display = "none";
+      }
+      /* 協力プレイ：メンバー成績ランキング（撃破数→与ダメージの順で順位付け）。
+         自分の行はハイライトする。ゲストの手動退出後は cleanup で localIdx が
+         戻ってしまうので、退避された coopMyIdx を優先する */
+      const crb = el("coopRankBox");
+      if (crb) {
+        if (G.players.length >= 2) {
+          const myIdx = (typeof G.coopMyIdx === "number") ? G.coopMyIdx : (G.localIdx || 0);
+          const rows = G.players.map(p => ({ idx: p.id, charId: p.charId, name: PLAYER_NAMES[p.id] || "", dmg: Math.round(p.dmg || 0), kills: p.kills || 0 }))
+            .sort((a, b) => (b.kills - a.kills) || (b.dmg - a.dmg));
+          el("coopRankRows").innerHTML = rows.map((r, i) =>
+            '<div class="rankrow' + (r.idx === myIdx ? " me" : "") + '"><span class="rk">' + (i + 1) + "位</span>" +
+            '<span class="rwho">' + (r.name ? escHtml(r.name) : "P" + (r.idx + 1)) + '</span>' +
+            '<span class="rdet">' + charCfg(r.charId).label + '</span>' +
+            '<b class="rscore">撃破 ' + r.kills.toLocaleString("ja-JP") + "／ダメージ " + r.dmg.toLocaleString("ja-JP") + '</b></div>').join("");
+          crb.style.display = "";
+        } else crb.style.display = "none";
+      }
+      /* スコアランキング（この端末の歴代TOP10）へ今回のランを登録して表示 */
+      const myRank = recordRanking({ name: myNickname, score, time: timeSec, kills: G.kills, level: G.level, diff: G.difficulty, char: G.character, coop: G.players.length, at: Date.now() });
+      renderRankingInto(el("rankRows"), myRank);
+      el("rankNote").textContent = myRank >= 0
+        ? "今回のスコアは歴代 " + (myRank + 1) + " 位にランクイン！"
+        : "今回のスコアはTOP10ランク外でした";
       document.getElementById("feverEdge").classList.remove("on");
       const rscr = el("resultScr");
       rscr.classList.add("on");
@@ -5356,6 +5520,7 @@
       draw();
     }
     requestAnimationFrame(frame);
+    initNicknameUI();
     updateTitleBest();
     refreshResumeUI();
     updateTitleGear();
@@ -5408,12 +5573,18 @@
       function hideWait() { const w = el("coopWait"); if (w) w.classList.remove("on"); }
 
       /* ---------------- ロビー表示 ---------------- */
+      /* メンバー一覧のニックネームを、頭上ラベル／リザルト用の共有表へ反映する */
+      function syncNames() {
+        for (const m of NET.members) PLAYER_NAMES[m.idx] = m.name || "";
+        PLAYER_NAMES[NET.myIdx] = myNickname;
+      }
       function renderMembers() {
         const box = el("coopMembers"); if (!box) return;
+        syncNames();
         const list = NET.members.slice().sort((a, b) => a.idx - b.idx);
         box.innerHTML = list.map(m =>
           '<div class="memberrow"><span class="pdot" style="background:' + (PLAYER_COLORS[m.idx % PLAYER_COLORS.length]) + '"></span>' +
-          "<span>P" + (m.idx + 1) + "　" + charCfg(m.charId).label + "</span>" +
+          "<span>" + (m.name ? escHtml(m.name) : "P" + (m.idx + 1)) + "　" + charCfg(m.charId).label + "</span>" +
           (m.idx === 0 ? '<span class="phost">ホスト</span>' : "") +
           (m.idx === NET.myIdx ? '<span class="pyou">あなた</span>' : "") + "</div>"
         ).join("") || '<div class="memberrow"><span>メンバーを待っています…</span></div>';
@@ -5439,7 +5610,7 @@
         try { if (NET.hostConn && NET.hostConn.open) NET.hostConn.send(obj); } catch (e) {}
       }
       function rosterPayload() {
-        return [{ idx: 0, charId: G.character || selectedCharacter }].concat(NET.guests.map(g => ({ idx: g.idx, charId: g.charId })));
+        return [{ idx: 0, charId: G.character || selectedCharacter, name: myNickname }].concat(NET.guests.map(g => ({ idx: g.idx, charId: g.charId, name: g.name || "" })));
       }
       function broadcastRoster() {
         NET.members = rosterPayload();
@@ -5453,6 +5624,9 @@
         try { if (NET.hostConn) NET.hostConn.close(); } catch (e) {}
         for (const g of NET.guests) { try { if (g.conn) g.conn.close(); } catch (e) {} }
         try { if (NET.peer) NET.peer.destroy(); } catch (e) {}
+        G.coopMyIdx = NET.myIdx; /* リザルトの自分行ハイライト用に切断前の自分の番号を退避 */
+        for (const k in PLAYER_NAMES) delete PLAYER_NAMES[k];
+        PLAYER_NAMES[0] = myNickname;
         NET.mode = "solo"; NET.peer = null; NET.hostConn = null; NET.guests = [];
         NET.hostInputs = {}; NET.inGame = false; NET.inLobby = false;
         NET.session = null; NET.awaitingPick = false; NET.members = [];
@@ -5487,7 +5661,7 @@
         NET.peer.on("open", () => {
           NET.mode = "host"; NET.myIdx = 0;
           G.coop = true; G.localIdx = 0;
-          NET.members = [{ idx: 0, charId: selectedCharacter }];
+          NET.members = [{ idx: 0, charId: selectedCharacter, name: myNickname }];
           setStatus("");
           openLobby("このコードを一緒に遊ぶ人に伝えてね。みんなが入ったら「出撃する」を押してね（1人でも出撃できます）。");
           beep(660, 0.06, "square", 0.03);
@@ -5501,7 +5675,7 @@
             NET.peer = new Peer(PEER_PREFIX + NET.code.toLowerCase());
             NET.peer.on("open", () => {
               NET.mode = "host"; NET.myIdx = 0; G.coop = true; G.localIdx = 0;
-              NET.members = [{ idx: 0, charId: selectedCharacter }];
+              NET.members = [{ idx: 0, charId: selectedCharacter, name: myNickname }];
               setStatus("");
               openLobby("このコードを一緒に遊ぶ人に伝えてね。みんなが入ったら「出撃する」を押してね（1人でも出撃できます）。");
             });
@@ -5529,12 +5703,12 @@
             if (NET.guests.length >= 3) { try { conn.send({ t: "full" }); } catch (e) {} setTimeout(() => { try { conn.close(); } catch (e) {} }, 300); return; }
             let idx = 1;
             while (NET.guests.some(q => q.idx === idx)) idx++;
-            g = { idx, charId: (data.charId && CHARACTERS[data.charId]) ? data.charId : "mint", conn };
+            g = { idx, charId: (data.charId && CHARACTERS[data.charId]) ? data.charId : "mint", name: sanitizeNickname(data.name), conn };
             NET.guests.push(g);
             try { conn.send({ t: "welcome", idx }); } catch (e) {}
             broadcastRoster();
             if (NET.inGame) hostLateJoin(g);
-            else showWarn("P" + (idx + 1) + " " + charCfg(g.charId).name + " が参加しました", 1600);
+            else showWarn((g.name || "P" + (idx + 1) + " " + charCfg(g.charId).name) + " が参加しました", 1600);
           }
           return;
         }
@@ -5554,6 +5728,7 @@
         const g = NET.guests[gi];
         NET.guests.splice(gi, 1);
         delete NET.hostInputs[idx];
+        delete PLAYER_NAMES[idx];
         if (NET.inGame) {
           const pi = G.players.findIndex(p => p.id === idx);
           if (pi >= 0) {
@@ -5582,7 +5757,7 @@
         addWeapon(p, charCfg(g.charId).weapon);
         G.coopRoster = G.players.map(q => q.charId);
         try { g.conn.send(startPayloadFor(g.idx)); } catch (e) {}
-        showWarn("P" + (g.idx + 1) + " " + charCfg(g.charId).name + " が合流しました", 1800);
+        showWarn((g.name || "P" + (g.idx + 1) + " " + charCfg(g.charId).name) + " が合流しました", 1800);
       }
 
       /* ---------------- ゲスト：コードで参加 ---------------- */
@@ -5602,7 +5777,7 @@
         NET.peer.on("open", () => {
           const conn = NET.peer.connect(PEER_PREFIX + raw.toLowerCase(), { reliable: true });
           NET.hostConn = conn;
-          conn.on("open", () => { try { conn.send({ t: "hello", charId: selectedCharacter }); } catch (e) {} });
+          conn.on("open", () => { try { conn.send({ t: "hello", charId: selectedCharacter, name: myNickname }); } catch (e) {} });
           conn.on("data", guestOnData);
           conn.on("close", () => {
             if (NET.mode === "guest") failToTitle("ホストが切断しました。タイトルに戻ります。");
@@ -5646,7 +5821,7 @@
       function startPayloadFor(youIdx) {
         return {
           t: "start", diff: G.difficulty, chalId: chalCfg().id, youIdx,
-          roster: G.players.map(p => ({ idx: p.id, charId: p.charId }))
+          roster: G.players.map(p => ({ idx: p.id, charId: p.charId, name: p.id === 0 ? myNickname : ((NET.guests.find(q => q.idx === p.id) || {}).name || "") }))
         };
       }
       function guestStart(data) {
@@ -5656,6 +5831,8 @@
         NET.session = null; NET.awaitingPick = false;
         G.coop = true; G.localIdx = NET.myIdx;
         G.coopRoster = (data.roster || []).slice().sort((a, b) => a.idx - b.idx).map(r => r.charId);
+        for (const r of data.roster || []) PLAYER_NAMES[r.idx] = r.name || "";
+        PLAYER_NAMES[NET.myIdx] = myNickname;
         if (data.diff && DIFFICULTIES[data.diff]) selectedDifficulty = data.diff;
         el("coopScr").classList.remove("on");
         hideWait();
@@ -5693,6 +5870,12 @@
         G.endless = !!data.endless; G.endlessStartKills = data.endlessStartKills || 0;
         G.cleared = !!data.cleared || !!data.win;
         G.manualEnd = !!data.manual;
+        /* ホストから届いた最終メンバー成績を自端末のプレイヤーへ反映（リザルト順位用） */
+        for (const m of data.members || []) {
+          PLAYER_NAMES[m.idx] = m.name || "";
+          const p = G.players.find(q => q.id === m.idx);
+          if (p) { p.dmg = m.dmg || 0; p.kills = m.kills || 0; }
+        }
         endGame(!!data.win);
       }
       function guestResume() {
@@ -5820,7 +6003,7 @@
           bossUid: (G.boss && !G.boss.dead) ? G.boss.uid : 0,
           dog: G.dog ? [R1(G.dog.x), R1(G.dog.y), G.dog.face, G.dog.moving ? 1 : 0, Math.round(G.dog.animT * 10) / 10, G.dog.barkFx > 0 ? 1 : 0] : null,
           players: G.players.map(p => [p.id, R1(p.x), R1(p.y), Math.ceil(p.hp), p.maxHp, p.alive ? 1 : 0, p.downed ? 1 : 0, p.charId, p.face, p.moving ? 1 : 0, p.back ? 1 : 0, Math.round(p.walkPh * 10) / 10, R1(p.stepDist), p.invuln > 0 ? 1 : 0, R2(p.orbitAng), R2(p.senpuuAng), p.holy ? 1 : 0, R2(p.reviveP || 0),
-            p.weapons.map(w => [w.id, w.lv, w.evo ? 1 : 0, w.awk || 0]), p.passives]),
+            p.weapons.map(w => [w.id, w.lv, w.evo ? 1 : 0, w.awk || 0]), p.passives, Math.round(p.dmg || 0), p.kills || 0]),
           enemies: G.enemies.map(e => [e.uid, e.type, R1(e.x), R1(e.y), Math.ceil(e.hp), R1(e.maxHp), e.r, e.elite ? 1 : 0, e.boss ? 1 : 0, e.face || 1, R2(e.ang || 0), Math.round((e.fuse === undefined ? -1 : e.fuse) * 10) / 10, e.mode || "chase", e.enraged ? 1 : 0, Math.round((e.ph || 0) * 10) / 10, e.flash > 0 ? 1 : 0, R2(e.teleAng || 0), R1(e.teleLen || 0), Math.round((e.modeT || 0) * 10) / 10]),
           gems: G.gems.map(g => [R1(g.x), R1(g.y), g.val]),
           items: G.items.map(i => [i.kind, R1(i.x), R1(i.y), i.r]),
@@ -5872,6 +6055,7 @@
           p.invuln = a[13] ? 0.3 : 0; p.orbitAng = a[14]; p.senpuuAng = a[15]; p.holy = !!a[16]; p.reviveP = a[17] || 0;
           p.weapons = (a[18] || []).map(w => ({ id: w[0], lv: w[1], evo: !!w[2], awk: w[3] || 0, t: 0 }));
           p.passives = a[19] || {};
+          p.dmg = a[20] || 0; p.kills = a[21] || 0; /* 個人成績（リザルト順位用） */
           if (a[0] === NET.myIdx) syncBuildUI();
         }
         G.players = G.players.filter(p => seenP.has(p.id));
@@ -6034,7 +6218,9 @@
             t: "end", win: !!isClear, time: G.time, kills: G.kills, level: G.level,
             maxCombo: G.maxCombo, chestsOpened: G.chestsOpened, bonusScore: G.bonusScore || 0,
             endless: !!G.endless, endlessStartKills: G.endlessStartKills || 0, cleared: !!G.cleared,
-            manual: !!G.manualEnd
+            manual: !!G.manualEnd,
+            /* リザルトのメンバー成績ランキング用：最終的な個人成績を同報する */
+            members: G.players.map(p => ({ idx: p.id, charId: p.charId, name: PLAYER_NAMES[p.id] || "", dmg: Math.round(p.dmg || 0), kills: p.kills || 0 }))
           });
           NET.inGame = false;
         },
