@@ -261,13 +261,22 @@
 
       /* ---------- overlays ---------- */
       .overlay {
-        position: absolute; inset: 0; display: none; place-items: center;
+        position: absolute; inset: 0; display: none;
         background: rgba(4,6,14,.72); backdrop-filter: blur(3px); z-index: 10;
         /* シートがノッチやホームインジケーターに被らないよう、余白にもセーフエリアを足す */
         padding: calc(18px + var(--sat)) calc(18px + var(--sar)) calc(18px + var(--sab)) calc(18px + var(--sal));
         overflow-y: auto;
+        /* スクロール容器自身が縦スワイプを受け付けることを明示する：祖先（body / #wrap）に
+           touch-action:none がある環境では、容器側で pan-y を宣言しておかないと
+           iOS Safari がシート内のスワイプをスクロールとして扱わないことがある。
+           中央寄せは grid の place-items ではなく、flex + .sheet の margin:auto で行う。
+           place-items:center はシートが画面より高いときに上端・下端がスクロール
+           範囲の外へはみ出して到達不能になるブラウザがあるため使わない
+           （auto マージンは余白が無いとき 0 になり、先頭から末尾まで全域スクロールできる） */
+        touch-action: pan-y;
+        -webkit-overflow-scrolling: touch;
       }
-      .overlay.on { display: grid; }
+      .overlay.on { display: flex; flex-direction: column; }
       .sheet {
         width: min(680px, 100%); min-width: 0; background: linear-gradient(165deg, #161e38 0%, var(--panel) 55%, #0c1220 100%); border: 2px solid var(--line);
         border-radius: 14px; padding: clamp(18px, 4vw, 32px);
@@ -5084,7 +5093,9 @@
       countUp(el("stCombo"), G.maxCombo, 900);
       countUp(el("stChest"), G.chestsOpened, 700);
       document.getElementById("feverEdge").classList.remove("on");
-      el("resultScr").classList.add("on");
+      const rscr = el("resultScr");
+      rscr.classList.add("on");
+      rscr.scrollTop = 0; /* 前回の表示で途中まで送った位置が残らないよう、先頭から見せる */
       updateTitleBest();
       if (isClear) SE.win(); else SE.over();
       /* 協力プレイ（ホスト）：リザルト内容をゲストへ送り、各端末で集計させる */
@@ -5313,8 +5324,13 @@
     function frame(ts) {
       requestAnimationFrame(frame);
       /* タイトル以外（プレイ・ポーズ・レベルアップ等）ではページ自体を固定し、
-         スクロールや引っ張って更新が一切起きない状態を保つ */
-      document.body.classList.toggle("noscroll", G.state !== "title");
+         スクロールや引っ張って更新が一切起きない状態を保つ。
+         ただしリザルト表示中（win / over）は固定を外す：body が position:fixed の
+         間は iOS Safari でシート内スクロールが効かなくなることがあり、背の高い
+         リザルトシートの下部（再戦／ホームボタン）に指が届かなくなるため。
+         リザルト中は #wrap 自体が fixed で画面を覆い、overscroll-behavior:none で
+         引っ張って更新も抑止済みなので、ページ側が動く心配はない */
+      document.body.classList.toggle("noscroll", G.state !== "title" && G.state !== "win" && G.state !== "over");
       if (!G.lastTs) G.lastTs = ts;
       let dt = (ts - G.lastTs) / 1000;
       G.lastTs = ts;
