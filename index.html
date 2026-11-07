@@ -59,8 +59,9 @@
       body.noscroll { position: fixed; left: 0; right: 0; top: 0; width: 100%; }
       .dot { font-family: "DotGothic16", "Hiragino Kaku Gothic ProN", sans-serif; }
 
-      /* 高さ・位置は JS の resize() が visualViewport の実表示領域に px で吸着
-         させる（下記 resize 参照）。CSS 側は JS が走るまでの保険として 100lvh
+      /* 高さ・位置は JS の resize() が「vv.height / innerHeight / 100lvh
+         プローブ実測の最大値」に px で吸着させる（下記 resize 参照）。
+         CSS 側は JS が走るまでの保険として 100lvh
          （ツールバー裏まで届く最大ビューポート）を敷き、背景もタイトル画面の
          テーマ色にして、万一隙間が出ても黒帯に見えないようにする */
       #wrap { position: fixed; inset: 0; height: 100lvh; background: #0d1531; touch-action: none; }
@@ -1274,22 +1275,55 @@
     const wrapEl = document.getElementById("wrap");
     const ctx = cv.getContext("2d");
     let VW = 0, VH = 0, DPR = 1, wrapH = 0;
+    /* 100lvh（ツールバー裏まで含む最大ビューポート）の実測用プローブ。
+       iPhone 実機では visualViewport.height が画面本来の高さより小さい値の
+       まま固まり、vv の resize/scroll イベントでも毎フレームの比較でも
+       回復できないことがある（2026-11-08 実測：vv.height ≈797pt のまま
+       画面は 844pt で、#wrap の下端が届かず body 背景色の帯が残った）。
+       そのためラッパーの高さは vv.height / innerHeight / このプローブ
+       実測の最大値で決める。プローブ実測は resize() のたびに更新して
+       キャッシュし、毎フレームのガード比較ではキャッシュを使う
+       （レイアウト再計算を毎フレーム走らせないため） */
+    let lvhProbe = null, probeH = 0;
+    function measureProbeH() {
+      if (!lvhProbe) {
+        lvhProbe = document.createElement("div");
+        lvhProbe.setAttribute("aria-hidden", "true");
+        lvhProbe.style.cssText = "position:fixed;left:0;top:0;width:0;height:100vh;height:100lvh;visibility:hidden;pointer-events:none;";
+        (document.body || document.documentElement).appendChild(lvhProbe);
+      }
+      return Math.round(lvhProbe.getBoundingClientRect().height) || 0;
+    }
+    /* ラッパーの目標サイズ。高さは「実画面の高さの最良推定」＝3系統の
+       最大値。上端は vv.offsetTop を基本にしつつ、「top + 高さ」が実画面
+       （＝その最大値）をはみ出さない範囲へクランプする（基本は 0 側） */
+    function targetWrapSize() {
+      const vv = window.visualViewport;
+      const vvH = vv ? Math.round(vv.height) : 0;
+      const screenH = Math.max(vvH, window.innerHeight || 0, probeH);
+      const targetH = screenH;
+      const rawTop = vv ? Math.round(vv.offsetTop || 0) : 0;
+      const top = Math.max(0, Math.min(rawTop, Math.max(0, screenH - targetH)));
+      return { h: targetH, top: top };
+    }
     function resize() {
       DPR = Math.min(window.devicePixelRatio || 1, 2);
-      /* ラッパーを「実際に見えている領域」（visualViewport）に吸着させる。
-         iPhone Safari ではツールバーの表示/非表示で layout viewport と
-         visual viewport の高さがずれ、innerHeight や fixed の inset:0 だけでは
-         ラップが実表示より短くなって下部に黒帯が残ることがある（実機で再発）。
-         そこで高さ＝vv.height、上端＝vv.offsetTop を px で直接指定し、
-         ツールバーの下端までゲーム画面を届かせる。高さを決めてから
-         キャンバスの表示サイズ（clientWidth/Height）を読むことで、描画
-         サイズと実際の表示領域が必ず一致する */
-      const vv = window.visualViewport;
-      wrapH = vv ? Math.round(vv.height) : (window.innerHeight || 0);
-      const vvTop = vv ? Math.round(vv.offsetTop || 0) : 0;
+      /* ラッパーを実画面いっぱいに吸着させる。高さは visualViewport だけに
+         頼らない：iPhone Safari ではツールバーの表示/非表示で layout viewport
+         と visual viewport の高さがずれるうえ、実機では vv.height が小さい
+         値のまま固まって #wrap の下端が画面下端まで届かず、下部に body
+         背景色の帯が残ることがある。innerHeight と 100lvh プローブ実測との
+         最大値を採ることで、vv が固まっていても下端まで届くようにする。
+         高さを決めてからキャンバスの表示サイズ（clientWidth/Height）を読む
+         ことで、描画サイズと実際の表示領域が必ず一致する。
+         HUD の下部要素は safe-area-inset-bottom（--sab）で逃がしてあるので、
+         ラッパーが画面下端まで伸びてもホームインジケータとは重ならない */
+      probeH = measureProbeH();
+      const target = targetWrapSize();
+      wrapH = target.h;
       if (wrapEl && wrapH > 0) {
         wrapEl.style.height = wrapH + "px";
-        wrapEl.style.top = vvTop + "px";
+        wrapEl.style.top = target.top + "px";
         wrapEl.style.bottom = "auto";
       }
       VW = cv.clientWidth || window.innerWidth;
@@ -1306,6 +1340,13 @@
       window.visualViewport.addEventListener("scroll", resize);
     }
     resize();
+    /* 起動直後は各ビューポート値が小さい初期値のまま固まることがあるため、
+       読み込み直後に数回かけ直し、復帰タイミング（pageshow / focus /
+       可視化）でも合わせ直して、後追いで正しい高さへ回復できるようにする */
+    [100, 400, 1000, 2000].forEach(ms => setTimeout(resize, ms));
+    window.addEventListener("pageshow", resize);
+    window.addEventListener("focus", resize);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) resize(); });
 
     const TAU = Math.PI * 2;
     const rand = (a, b) => a + Math.random() * (b - a);
@@ -7182,10 +7223,12 @@
       else if (G.state === "title") { G.cam.x = Math.sin(ts * 0.00007) * 160; G.cam.y = Math.cos(ts * 0.00009) * 120; }
       /* 表示領域の変化をイベントで取りこぼしたら（アプリ切り替え復帰時の
          シェル側リサイズ等）その場で合わせ直す：黒帯・見切れの残りを防ぐ。
-         比較は visualViewport の実表示高さで行う（Safari のツールバー開閉で
-         innerHeight とずれるため） */
-      const vvNow = window.visualViewport ? Math.round(window.visualViewport.height) : window.innerHeight;
-      if (vvNow !== wrapH || cv.clientWidth !== VW || cv.clientHeight !== VH) resize();
+         比較も resize() と同じ目標高さ（vv.height / innerHeight / 100lvh
+         プローブ実測の最大値）で行う。vv.height だけと比べると、vv が
+         小さい値で固まったときに「一致している」と誤認して帯が回復
+         できないため */
+      const targetNow = targetWrapSize().h;
+      if (targetNow !== wrapH || cv.clientWidth !== VW || cv.clientHeight !== VH) resize();
       draw();
     }
     requestAnimationFrame(frame);
