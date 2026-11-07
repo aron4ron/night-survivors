@@ -59,8 +59,9 @@
       body.noscroll { position: fixed; left: 0; right: 0; top: 0; width: 100%; }
       .dot { font-family: "DotGothic16", "Hiragino Kaku Gothic ProN", sans-serif; }
 
-      /* 高さ・位置は JS の resize() が「vv.height / innerHeight / 100lvh
-         プローブ実測の最大値」に px で吸着させる（下記 resize 参照）。
+      /* 高さ・位置は JS の resize() が「vv.height / innerHeight / 100lvh・
+         100dvh プローブ実測＋条件付きの画面実寸候補の最大値」に px で
+         吸着させる（下記 resize 参照）。
          CSS 側は JS が走るまでの保険として 100lvh
          （ツールバー裏まで届く最大ビューポート）を敷き、背景もタイトル画面の
          テーマ色にして、万一隙間が出ても黒帯に見えないようにする */
@@ -1294,15 +1295,18 @@
     const wrapEl = document.getElementById("wrap");
     const ctx = cv.getContext("2d");
     let VW = 0, VH = 0, DPR = 1, wrapH = 0;
-    /* 100lvh（ツールバー裏まで含む最大ビューポート）の実測用プローブ。
+    /* 100lvh（ツールバー裏まで含む最大ビューポート）と 100dvh（動的
+       ビューポート）の実測用プローブ。
        iPhone 実機では visualViewport.height が画面本来の高さより小さい値の
        まま固まり、vv の resize/scroll イベントでも毎フレームの比較でも
-       回復できないことがある（2026-11-08 実測：vv.height ≈797pt のまま
-       画面は 844pt で、#wrap の下端が届かず body 背景色の帯が残った）。
-       そのためラッパーの高さは vv.height / innerHeight / このプローブ
-       実測の最大値で決める。プローブ実測は resize() のたびに更新して
-       キャッシュし、毎フレームのガード比較ではキャッシュを使う
-       （レイアウト再計算を毎フレーム走らせないため） */
+       回復できないことがある。さらに 2026-11-08 の再確認では、vv.height /
+       innerHeight / 100lvh 実測がすべて ≈797pt を返し続け、画面本来の
+       844pt に届かず #wrap の下端に body 背景色の帯（約47pt）が残った。
+       そのためラッパーの高さは vv.height / innerHeight / 100lvh プローブ /
+       100dvh プローブの最大値に、条件付きで「画面実寸ベースの高さ」
+       （下記 screenPhysicalH）を加えた最大値で決める。プローブ実測は
+       resize() のたびに更新してキャッシュし、毎フレームのガード比較では
+       キャッシュを使う（レイアウト再計算を毎フレーム走らせないため） */
     let lvhProbe = null, probeH = 0;
     function measureProbeH() {
       if (!lvhProbe) {
@@ -1313,13 +1317,47 @@
       }
       return Math.round(lvhProbe.getBoundingClientRect().height) || 0;
     }
-    /* ラッパーの目標サイズ。高さは「実画面の高さの最良推定」＝3系統の
-       最大値。上端は vv.offsetTop を基本にしつつ、「top + 高さ」が実画面
-       （＝その最大値）をはみ出さない範囲へクランプする（基本は 0 側） */
+    let dvhProbe = null, dvhH = 0;
+    function measureDvhH() {
+      if (!dvhProbe) {
+        dvhProbe = document.createElement("div");
+        dvhProbe.setAttribute("aria-hidden", "true");
+        dvhProbe.style.cssText = "position:fixed;left:0;top:0;width:0;height:100vh;height:100dvh;visibility:hidden;pointer-events:none;";
+        (document.body || document.documentElement).appendChild(dvhProbe);
+      }
+      return Math.round(dvhProbe.getBoundingClientRect().height) || 0;
+    }
+    /* 「画面実寸ベースの高さ」候補：window.screen の実寸から、現在の向き
+       における画面の高さを返す。iOS が向きで screen.width / height を
+       入れ替える場合と入れ替えない場合の両方に耐えるため、縦向きなら
+       大きい方、横向きなら小さい方を採る。暴走防止としてタッチ端末の
+       ときだけ有効にする（PC のモニタ実寸を拾って巨大化させない）。
+       採用可否の範囲チェック（他候補より大きく、かつ約1.15倍以内か）は
+       targetWrapSize 側で行う。タッチでない／実寸が取れない場合は 0 */
+    function screenPhysicalH() {
+      const s = window.screen;
+      if (!s || !s.width || !s.height) return 0;
+      const isTouch = (navigator.maxTouchPoints || 0) > 0 || ("ontouchstart" in window);
+      if (!isTouch) return 0;
+      let landscape;
+      if (s.orientation && s.orientation.type) {
+        landscape = s.orientation.type.indexOf("landscape") === 0;
+      } else {
+        landscape = (window.innerWidth || 0) > (window.innerHeight || 0);
+      }
+      return landscape ? Math.min(s.width, s.height) : Math.max(s.width, s.height);
+    }
+    /* ラッパーの目標サイズ。高さは「実画面の高さの最良推定」＝ビューポート
+       系統（vv.height / innerHeight / 100lvh / 100dvh プローブ）の最大値に、
+       画面実寸候補が「その最大値より大きく、かつ約1.15倍以内」のときだけ
+       それを加えた最大値。上端は vv.offsetTop を基本にしつつ、「top + 高さ」
+       が実画面（＝その最大値）をはみ出さない範囲へクランプする（基本は 0 側） */
     function targetWrapSize() {
       const vv = window.visualViewport;
       const vvH = vv ? Math.round(vv.height) : 0;
-      const screenH = Math.max(vvH, window.innerHeight || 0, probeH);
+      let screenH = Math.max(vvH, window.innerHeight || 0, probeH, dvhH);
+      const physH = screenPhysicalH();
+      if (physH > screenH && physH <= screenH * 1.15) screenH = physH;
       const targetH = screenH;
       const rawTop = vv ? Math.round(vv.offsetTop || 0) : 0;
       const top = Math.max(0, Math.min(rawTop, Math.max(0, screenH - targetH)));
@@ -1331,13 +1369,15 @@
          頼らない：iPhone Safari ではツールバーの表示/非表示で layout viewport
          と visual viewport の高さがずれるうえ、実機では vv.height が小さい
          値のまま固まって #wrap の下端が画面下端まで届かず、下部に body
-         背景色の帯が残ることがある。innerHeight と 100lvh プローブ実測との
-         最大値を採ることで、vv が固まっていても下端まで届くようにする。
+         背景色の帯が残ることがある。innerHeight / 100lvh / 100dvh プローブ
+         実測との最大値に、条件付きの画面実寸候補を加えた最大値を採ることで、
+         ビューポート系の値がすべて小さく固まっていても下端まで届くようにする。
          高さを決めてからキャンバスの表示サイズ（clientWidth/Height）を読む
          ことで、描画サイズと実際の表示領域が必ず一致する。
          HUD の下部要素は safe-area-inset-bottom（--sab）で逃がしてあるので、
          ラッパーが画面下端まで伸びてもホームインジケータとは重ならない */
       probeH = measureProbeH();
+      dvhH = measureDvhH();
       const target = targetWrapSize();
       wrapH = target.h;
       if (wrapEl && wrapH > 0) {
@@ -7251,8 +7291,9 @@
       else if (G.state === "title") { G.cam.x = Math.sin(ts * 0.00007) * 160; G.cam.y = Math.cos(ts * 0.00009) * 120; }
       /* 表示領域の変化をイベントで取りこぼしたら（アプリ切り替え復帰時の
          シェル側リサイズ等）その場で合わせ直す：黒帯・見切れの残りを防ぐ。
-         比較も resize() と同じ目標高さ（vv.height / innerHeight / 100lvh
-         プローブ実測の最大値）で行う。vv.height だけと比べると、vv が
+         比較も resize() と同じ目標高さ（vv.height / innerHeight / 100lvh /
+         100dvh プローブ実測＋条件付きの画面実寸候補の最大値）で行う。
+         vv.height だけと比べると、vv が
          小さい値で固まったときに「一致している」と誤認して帯が回復
          できないため */
       const targetNow = targetWrapSize().h;
