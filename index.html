@@ -946,8 +946,8 @@
           <div class="diffwrap">
             <div class="diffhead">相 棒</div>
             <div class="diffrow" role="group" aria-label="相棒選択">
-              <button class="diffbtn petbtn sel" data-pet="dog" type="button"><span class="dn dot">ダックス</span><span class="dd">ロングヘアーのダックスフンド。ジェムとアイテムを拾ってくる</span><span class="dm">回収範囲 460</span></button>
-              <button class="diffbtn petbtn" data-pet="cat" type="button"><span class="dn dot">🐱 子猫のモチ【新】</span><span class="dd">鈴付きリボンの子猫。少し離れたジェムも拾ってくる回収上手</span><span class="dm">回収範囲 620</span></button>
+              <button class="diffbtn petbtn sel" data-pet="dog" type="button"><span class="dn dot">ダックス</span><span class="dd">ロングヘアーのダックスフンド。吠えが強力で近くの敵を大きく弾く守り上手。回収範囲は控えめ</span><span class="dm">回収範囲 460 ／ 吠え強力</span></button>
+              <button class="diffbtn petbtn" data-pet="cat" type="button"><span class="dn dot">🐱 子猫のモチ【新】</span><span class="dd">鈴付きリボンの子猫。少し離れたジェムも拾ってくる回収上手。にゃんパンチは弱めで戦闘は苦手</span><span class="dm">回収範囲 620 ／ パンチ弱め</span></button>
             </div>
           </div>
           <div class="diffwrap">
@@ -1836,11 +1836,16 @@
     let selectedMode = "normal"; /* セッション内のみ（誤って毎回ラッシュにならないよう保存しない） */
 
     /* ---------------- 相棒（コンパニオン）選択 ----------------
-       dog: ダックスフンド（従来通り）。cat: 子猫のモチ ― ジェム回収範囲が広めで、
-       少し離れたジェムも拾ってくる。吠え（にゃんパンチ）の性能はダックスと同等 */
+       dog: ダックスフンド ― 回収範囲は控えめ（460）だが吠えが強力な守り特化
+       （範囲132／発動判定140／ダメージ14／ノックバック480・ボス60／CD1.7秒）。
+       cat: 子猫のモチ ― 回収範囲が広い（620）回収特化の代わり、にゃんパンチは弱め
+       （範囲84／発動判定88／ダメージ4／ノックバック170・ボス15／CD2.8秒）。
+       取りに行く速さ（335）は両者共通 */
     const COMPANIONS = {
-      dog: { name: "ダックス", label: "ダックス（バンダナ）", gemRange: 460, cry: "ワン！" },
-      cat: { name: "モチ",     label: "子猫のモチ",           gemRange: 620, cry: "にゃん！" }
+      dog: { name: "ダックス", label: "ダックス（バンダナ）", gemRange: 460, cry: "ワン！",
+             barkRange: 132, barkTrigger: 140, barkDmg: 14, barkKb: 480, barkKbBoss: 60, barkCd: 1.7 },
+      cat: { name: "モチ",     label: "子猫のモチ",           gemRange: 620, cry: "にゃん！",
+             barkRange: 84, barkTrigger: 88, barkDmg: 4, barkKb: 170, barkKbBoss: 15, barkCd: 2.8 }
     };
     const PET_KEY = "nightSurvivorsPetV1";
     let selectedPet = "dog";
@@ -3483,19 +3488,20 @@
         dog.x += dx / dl * step; dog.y += dy / dl * step;
         if (Math.abs(dx) > 2) dog.face = dx > 0 ? 1 : -1;
       }
-      /* 吠え：近くの敵をノックバック＋小ダメージ（クールダウン約2.3秒） */
-      if (dog.barkT <= 0 && nearestEnemy(dog.x, dog.y, 108)) {
-        dog.barkT = 2.3; dog.barkFx = 0.28;
-        G.rings.push({ x: dog.x, y: dog.y - 4, t: 0, life: 0.28, maxR: 104, color: "#fda4af" });
-        addFloat(dog.x, dog.y - 28, petCfg().cry, "#fda4af", 15);
+      /* 吠え／にゃんパンチ：近くの敵をノックバック＋ダメージ（性能は相棒ごとに petCfg() で差別化） */
+      const pc = petCfg();
+      if (dog.barkT <= 0 && nearestEnemy(dog.x, dog.y, pc.barkTrigger)) {
+        dog.barkT = pc.barkCd; dog.barkFx = 0.28;
+        G.rings.push({ x: dog.x, y: dog.y - 4, t: 0, life: 0.28, maxR: pc.barkRange, color: "#fda4af" });
+        addFloat(dog.x, dog.y - 28, pc.cry, "#fda4af", 15);
         SE.bark();
         for (const e of G.enemies) {
           if (e.dead) continue;
-          if (dist2(dog.x, dog.y, e.x, e.y) < Math.pow(104 + e.r, 2)) {
+          if (dist2(dog.x, dog.y, e.x, e.y) < Math.pow(pc.barkRange + e.r, 2)) {
             const ka = Math.atan2(e.y - dog.y, e.x - dog.x);
-            const kb = e.boss ? 30 : 300;
-            ATK = G.players[0] || null; /* ダックスの吠えは飼い主（先頭プレイヤー）へ帰属 */
-            damageEnemy(e, 7, Math.cos(ka) * kb, Math.sin(ka) * kb, false);
+            const kb = e.boss ? pc.barkKbBoss : pc.barkKb;
+            ATK = G.players[0] || null; /* 相棒の吠えは飼い主（先頭プレイヤー）へ帰属 */
+            damageEnemy(e, pc.barkDmg, Math.cos(ka) * kb, Math.sin(ka) * kb, false);
             ATK = null;
           }
         }
