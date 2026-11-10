@@ -604,6 +604,12 @@
         margin-top: 16px; padding: 10px 12px; border: 1.5px solid var(--amber); border-radius: 8px;
         background: rgba(255,176,32,.08); color: #fde68a; font-size: 12.5px; line-height: 1.6; text-align: left;
       }
+      /* タイトル画面のiPhone向け注意書き */
+      .glassnote {
+        margin: 0 0 12px; padding: 10px 12px; border: 1.5px solid var(--amber); border-radius: 8px;
+        background: rgba(255,176,32,.08); color: #fde68a; font-size: 12px; line-height: 1.65; text-align: left;
+      }
+      .glassnote .gn-head { font-weight: 800; margin-bottom: 2px; }
       #saveMsg { min-height: 1.4em; font-size: 13px; margin-top: 10px; }
       #saveMsg.ok { color: #4ade80; }
       #saveMsg.err { color: #fda4af; }
@@ -897,6 +903,12 @@
             📱 <b>ホーム画面に追加すると全画面で遊べるよ！</b><br>
             共有ボタン（四角に↑のマーク）をタップ → 「ホーム画面に追加」を選んでね
             <button id="a2hsClose" aria-label="案内を閉じる">✕</button>
+          </div>
+          <div class="glassnote">
+            <div class="gn-head">⚠️ iPhoneで遊ぶ方へ</div>
+            画面の一番上（時計・電池の段）がぼやけて見える場合は、iOSの「すりガラス（Liquid Glass）」効果が原因です。ゲームの不具合ではありません。<br>
+            直し方：「設定」→「アクセシビリティ」→「画面表示とテキストサイズ」→「透明度を下げる」をオン<br>
+            これでぼやけが取れて、くっきり表示されます。
           </div>
           <p class="tagline">
             四方から迫る魔物の群れを自動攻撃でなぎ倒し、経験値ジェムを拾って育ち、
