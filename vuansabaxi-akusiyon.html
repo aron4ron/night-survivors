@@ -2523,7 +2523,8 @@
         if (c && !(window.__coop && window.__coop.choiceClick(c, true))) chooseChestCard(c);
       }
       if ((e.key === "Escape" || e.key.toLowerCase() === "p")) {
-        if (G.state === "playing") pauseGame();
+        if (el("runShopScr").classList.contains("on")) closeRunShop();
+        else if (G.state === "playing") pauseGame();
         else if (G.state === "pause") resumeGame();
       }
     });
@@ -2648,14 +2649,22 @@
     /* スクロール/引っ張って更新の発生源ブロック（passive:false でないと止められない）。
        プレイ中は画面のどこをドラッグしてもページは動かず、ジェスチャ判定に
        スティック操作を横取りされない */
+    /* 開いているオーバーレイ（シート）の中のタッチはスクロール用に素通しする。
+       協力プレイのゲストは戦場ショップを開いても state が "playing" のまま
+       （ホストの試合を止められない）ので、ここで一律に止めるとシート内が
+       スクロールできず、下部の「閉じる」に指が届かなくなる */
+    function inOpenOverlay(e) {
+      const t = e.target;
+      return !!(t && t.closest && t.closest(".overlay.on"));
+    }
     document.addEventListener("touchmove", e => {
-      if ((G.state === "playing" || joy.active) && e.cancelable) e.preventDefault();
+      if (!inOpenOverlay(e) && (G.state === "playing" || joy.active) && e.cancelable) e.preventDefault();
     }, { passive: false });
     cv.addEventListener("touchstart", e => {
       if (G.state === "playing" && e.cancelable) e.preventDefault();
     }, { passive: false });
     document.addEventListener("gesturestart", e => {
-      if (G.state === "playing" || joy.active) e.preventDefault();
+      if (!inOpenOverlay(e) && (G.state === "playing" || joy.active)) e.preventDefault();
     });
 
     /* プレイヤー idx の移動入力（協力時は idx ごとに別ソースへ差し替え可能） */
@@ -7575,6 +7584,9 @@
     el("pauseBtn").addEventListener("click", () => { if (G.state === "playing") pauseGame(); });
     el("runShopBtn").addEventListener("click", () => { if (G.state === "playing") openRunShop(); });
     el("runShopCloseBtn").addEventListener("click", closeRunShop);
+    /* シートの外側（暗い背景部分）のタップでも閉じられる：万一スクロール
+       できない環境でも「閉じられない」状態にならないための逃げ道 */
+    el("runShopScr").addEventListener("click", e => { if (e.target === e.currentTarget) closeRunShop(); });
     el("autoPickBtn").addEventListener("click", () => {
       autoPickSetting = !autoPickSetting;
       G.autoPick = autoPickSetting;
@@ -7666,7 +7678,13 @@
          リザルトシートの下部（再戦／ホームボタン）に指が届かなくなるため。
          リザルト中は #wrap 自体が fixed で画面を覆い、overscroll-behavior:none で
          引っ張って更新も抑止済みなので、ページ側が動く心配はない */
-      document.body.classList.toggle("noscroll", G.state !== "title" && G.state !== "win" && G.state !== "over");
+      /* 戦場ショップ表示中も固定を外す（リザルトと同じ理由）。協力プレイの
+         ゲストはショップを開いても state が "playing" のままで固定が残り、
+         iOS Safari でシート内スクロールが効かなくなるため。ショップの
+         オーバーレイが画面全体を覆い、overscroll-behavior:none もあるので
+         ページ側が動く心配はない */
+      const runShopOpen = el("runShopScr").classList.contains("on");
+      document.body.classList.toggle("noscroll", G.state !== "title" && G.state !== "win" && G.state !== "over" && !runShopOpen);
       if (!G.lastTs) G.lastTs = ts;
       let dt = (ts - G.lastTs) / 1000;
       G.lastTs = ts;
@@ -7713,7 +7731,9 @@
     /* =========================================================
        協力プレイ（オンライン・最大4人）— PeerJS (WebRTC P2P) ホスト権威型
        - ホストがシミュレーション（敵・XP・ドロップ・ボス）を進行し、
-         約12回/秒のスナップショットをゲストへ配信する。ゲストは移動入力だけ送る
+         約17回/秒のスナップショットをゲストへ配信する。ゲストは移動入力だけ送る。
+         ゲスト側はスナップショット間の移動速度を推定して目標位置を先読みし、
+         「目標へ吸着→停止→次の目標へ吸着」の脈動（ラグ感）を抑える
        - 経験値とレベルはチーム共有。レベルアップ／宝箱は全員同時選択セッション
        - 力尽きたらダウン状態になり、仲間がそばに立つと蘇生できる
        - ソロプレイ（NET.mode === "solo"）では一切干渉しない
@@ -7733,7 +7753,7 @@
         awaitingPick: false,    // guest: 自分の選択待ちかどうか
         startingFromHost: false,
         snapTimer: 0, inputTimer: 0, lastInputSent: "", inputBeat: 0,
-        snapTime: 0, snapAt: 0, hostState: "title",
+        snapTime: 0, snapAt: 0, prevSnapAt: 0, snapInterval: 0.06, hostState: "title",
         prevMyHp: null, enemyPool: new Map(), projPool: [], gemPool: [],
         joinTimer: null, retryCode: 0
       };
@@ -8229,8 +8249,23 @@
         }
         return out;
       }
+      /* スナップショット間の移動速度（px/秒）を推定して o.svx / o.svy に
+         残す。guestFrame が「目標位置＋速度×経過時間」へ追随することで、
+         便と便の間で目標が静止して起きる脈動を消す。瞬間移動級の跳躍は
+         テレポートとみなして速度を捨てる（誤った先読みをしない） */
+      function snapVel(o, nx, ny, dtS) {
+        if (!(dtS > 0) || o.tx === undefined) return;
+        const nvx = (nx - o.tx) / dtS, nvy = (ny - o.ty) / dtS;
+        if (Math.hypot(nvx, nvy) > 1000) { o.svx = 0; o.svy = 0; return; }
+        o.svx = (o.svx || 0) * 0.45 + nvx * 0.55;
+        o.svy = (o.svy || 0) * 0.45 + nvy * 0.55;
+      }
       function applySnapshot(s) {
-        NET.snapTime = s.time; NET.snapAt = performance.now(); NET.hostState = s.hs;
+        const nowMs = performance.now();
+        const dtSnap = NET.prevSnapAt ? clamp((nowMs - NET.prevSnapAt) / 1000, 0.04, 0.4) : 0;
+        if (dtSnap) NET.snapInterval = dtSnap;
+        NET.prevSnapAt = nowMs;
+        NET.snapTime = s.time; NET.snapAt = nowMs; NET.hostState = s.hs;
         G.kills = s.kills; G.level = s.level; G.xp = s.xp; G.xpNext = s.xpNext;
         G.goldSpent = s.goldSpent || 0; /* 戦場ショップの使用額（ホスト権威で共有） */
         G.combo = s.combo; G.maxCombo = s.maxCombo; G.feverT = s.feverT;
@@ -8241,7 +8276,8 @@
         for (const a of s.players) {
           seenP.add(a[0]);
           let p = G.players.find(q => q.id === a[0]);
-          if (!p) { p = makePlayer(a[0], a[7]); p.x = a[1]; p.y = a[2]; G.players.push(p); }
+          if (!p) { p = makePlayer(a[0], a[7]); p.x = a[1]; p.y = a[2]; p.tx = a[1]; p.ty = a[2]; G.players.push(p); }
+          else snapVel(p, a[1], a[2], dtSnap);
           p.tx = a[1]; p.ty = a[2];
           if (a[0] === NET.myIdx) {
             if (NET.prevMyHp !== null && a[3] < NET.prevMyHp) { SE.hurt(); G.shake = Math.max(G.shake, 7); }
@@ -8265,7 +8301,7 @@
           if (!e) {
             e = { uid: a[0], kx: 0, ky: 0, touchT: 0, orbitT: 0, dead: false, wave: false, chX: 0, chY: 0, x: a[2], y: a[3], tx: a[2], ty: a[3] };
             NET.enemyPool.set(a[0], e);
-          }
+          } else snapVel(e, a[2], a[3], dtSnap);
           e.type = a[1]; e.tx = a[2]; e.ty = a[3]; e.hp = a[4]; e.maxHp = a[5]; e.r = a[6];
           e.elite = !!a[7]; e.boss = !!a[8]; e.face = a[9]; e.ang = a[10]; e.fuse = a[11];
           e.mode = a[12]; e.enraged = !!a[13]; e.ph = a[14]; e.flash = a[15] ? 0.09 : 0;
@@ -8280,7 +8316,7 @@
         } else el("bosswrap").classList.remove("on");
         NET.gemPool = poolMatch(NET.gemPool, s.gems, 80, 0, 1,
           a => ({ x: a[0], y: a[1], vx: 0, vy: 0, mag: false, got: false }),
-          (g, a) => { g.tx = a[0]; g.ty = a[1]; g.val = a[2]; const st = gemStyle(a[2]); g.color = st[0]; g.r = st[1]; });
+          (g, a) => { snapVel(g, a[0], a[1], dtSnap); g.tx = a[0]; g.ty = a[1]; g.val = a[2]; const st = gemStyle(a[2]); g.color = st[0]; g.r = st[1]; });
         G.gems = NET.gemPool;
         G.items = s.items.map(a => ({ kind: a[0], x: a[1], y: a[2], r: a[3], got: false }));
         G.chests = s.chests.map(a => ({ x: a[0], y: a[1], r: 17, fromBoss: !!a[2], t: a[3], ph: a[4], rainbow: !!a[5], got: false }));
@@ -8295,6 +8331,7 @@
         if (s.dog) {
           if (!G.dog) G.dog = makeDog();
           if (G.dog.tx === undefined) { G.dog.x = s.dog[0]; G.dog.y = s.dog[1]; }
+          else snapVel(G.dog, s.dog[0], s.dog[1], dtSnap);
           G.dog.tx = s.dog[0]; G.dog.ty = s.dog[1];
           G.dog.face = s.dog[2]; G.dog.moving = !!s.dog[3]; G.dog.animT = s.dog[4];
           if (s.dog[5]) G.dog.barkFx = Math.max(G.dog.barkFx, 0.18);
@@ -8309,6 +8346,9 @@
           ? NET.snapTime + Math.min(0.35, (performance.now() - NET.snapAt) / 1000)
           : NET.snapTime;
         const kp = 1 - Math.exp(-16 * dt), ke = 1 - Math.exp(-13 * dt), kg = 1 - Math.exp(-14 * dt);
+        /* 先読み量：最新便を受けてからの経過時間ぶん、推定速度で目標を進める
+           （上限は便間隔の1.6倍＋40ms。次の便が来れば速度ごと更新される） */
+        const lead = Math.min((performance.now() - NET.snapAt) / 1000, NET.snapInterval * 1.6 + 0.04);
         for (const p of G.players) {
           if (p.id === NET.myIdx) {
             /* 自分は入力で先行移動（予測）し、権威位置へ少しずつ寄せて補正する */
@@ -8327,11 +8367,20 @@
             if (dx * dx + dy * dy > 130 * 130) { p.x = p.tx; p.y = p.ty; }
             else { p.x += dx * Math.min(1, dt * 2.4); p.y += dy * Math.min(1, dt * 2.4); }
           } else {
-            p.x += (p.tx - p.x) * kp; p.y += (p.ty - p.y) * kp;
+            /* 他プレイヤー：静止した目標への吸着ではなく、先読みした移動中の
+               目標へ追随する（等速で動き続け、便の合間も止まらない） */
+            p.x += (p.tx + (p.svx || 0) * lead - p.x) * kp;
+            p.y += (p.ty + (p.svy || 0) * lead - p.y) * kp;
           }
         }
-        for (const e of G.enemies) { e.x += (e.tx - e.x) * ke; e.y += (e.ty - e.y) * ke; }
-        for (const g of G.gems) { g.x += (g.tx - g.x) * kg; g.y += (g.ty - g.y) * kg; }
+        for (const e of G.enemies) {
+          e.x += (e.tx + (e.svx || 0) * lead - e.x) * ke;
+          e.y += (e.ty + (e.svy || 0) * lead - e.y) * ke;
+        }
+        for (const g of G.gems) {
+          g.x += (g.tx + (g.svx || 0) * lead - g.x) * kg;
+          g.y += (g.ty + (g.svy || 0) * lead - g.y) * kg;
+        }
         for (const pr of G.projs) {
           pr.x += pr.vx * dt; pr.y += pr.vy * dt;
           const kd = Math.min(1, dt * 16);
@@ -8345,7 +8394,8 @@
         for (const pt of G.parts) { pt.t += dt; pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.vx *= 0.92; pt.vy *= 0.92; }
         G.parts = G.parts.filter(pt => pt.t < pt.life);
         if (G.dog && G.dog.tx !== undefined) {
-          G.dog.x += (G.dog.tx - G.dog.x) * kp; G.dog.y += (G.dog.ty - G.dog.y) * kp;
+          G.dog.x += (G.dog.tx + (G.dog.svx || 0) * lead - G.dog.x) * kp;
+          G.dog.y += (G.dog.ty + (G.dog.svy || 0) * lead - G.dog.y) * kp;
           G.dog.animT += dt;
           if (G.dog.barkFx > 0) G.dog.barkFx -= dt;
         }
@@ -8374,14 +8424,14 @@
           }
           if (NET.inGame) {
             NET.snapTimer -= dt;
-            const iv = G.state === "playing" ? 0.085 : 0.3;
+            const iv = G.state === "playing" ? 0.06 : 0.3;
             if (NET.snapTimer <= 0) { NET.snapTimer = iv; broadcast(buildSnapshot()); }
           }
         } else if (NET.mode === "guest" && NET.inGame) {
           NET.inputTimer -= dt;
           NET.inputBeat -= dt;
           if (NET.inputTimer <= 0) {
-            NET.inputTimer = 0.066;
+            NET.inputTimer = 0.05;
             const iv = inputVector(0);
             const key = iv.x.toFixed(2) + "," + iv.y.toFixed(2);
             if (key !== NET.lastInputSent || NET.inputBeat <= 0) {
