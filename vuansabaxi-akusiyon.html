@@ -1021,6 +1021,7 @@
           <p class="titlebest dot" id="titleBest" style="display:none"></p>
           <p class="titlebest dot" id="titleGold" style="display:none;color:#fde68a"></p>
           <p class="titlebest dot" id="titleGear" style="display:none;color:var(--teal)"></p>
+          <p class="titlebest dot" id="titlePlays" style="color:var(--sub);font-size:12px;margin-top:4px">総プレイ数 ―</p>
           <div><button class="ghostbtn" id="shopBtn" type="button">🛒 ショップ</button> <button class="ghostbtn" id="equipBtn" type="button">装備を付け替える</button> <button class="ghostbtn" id="recordsBtn" type="button">戦績を見る</button> <button class="ghostbtn" id="mobBtn" type="button">モブ図鑑</button> <button class="ghostbtn" id="saveDataBtn" type="button">💾 セーブデータ</button></div>
           <p class="note">協力プレイはホストの端末でゲームが進行する方式です。経験値とレベルはチーム共有、レベルアップは全員が同時に自分の3択を選びます。力尽きても仲間がそばに立っていれば蘇生できます（全員ダウンでゲームオーバー）。</p>
           <p class="note">ホーム画面に追加するとアプリみたいに遊べるよ。</p>
@@ -6683,6 +6684,42 @@
         t.textContent = "【" + DIFFICULTIES[selectedDifficulty].name + "】BEST SCORE " + b.score.toLocaleString("ja-JP") + "　／　最長生存 " + fmtTime(b.time) + "　／　最多撃破 " + b.kills.toLocaleString("ja-JP");
       } else t.style.display = "none";
     }
+    /* ---------------- 総プレイ数カウンター（外部API・Abacus） ----------------
+       タイトル表示のたびに現在値を取得し、新規ゲーム開始時にだけ +1 する。
+       通信はすべて非同期の投げっぱなしで、失敗・オフライン・タイムアウトでも
+       例外を外へ出さず、ゲームの動作を一切妨げない（取得できない間は「―」表示）。 */
+    const PLAYS_API = "https://abacus.jasoncameron.dev";
+    const PLAYS_KEY = "aron4ron-night-survivors/plays";
+    let playCount = null; /* 表示保持値：null = 未取得 */
+    function renderPlayCount() {
+      const t = el("titlePlays"); if (!t) return;
+      t.textContent = "総プレイ数 " + (playCount === null ? "―" : playCount.toLocaleString("ja-JP"));
+    }
+    function playsRequest(path, onValue) {
+      try {
+        if (typeof fetch !== "function") return;
+        let ctrl = null, timer = null;
+        if (typeof AbortController === "function") {
+          ctrl = new AbortController();
+          timer = setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 5000);
+        }
+        fetch(PLAYS_API + "/" + path + "/" + PLAYS_KEY, ctrl ? { signal: ctrl.signal } : undefined)
+          .then(r => (r && r.ok) ? r.json() : null)
+          .then(d => {
+            if (timer) clearTimeout(timer);
+            if (d && typeof d.value === "number" && isFinite(d.value)) onValue(d.value);
+          })
+          .catch(() => { if (timer) clearTimeout(timer); });
+      } catch (e) { /* カウンターの失敗は無視する */ }
+    }
+    function fetchPlayCount() {
+      playsRequest("get", v => { playCount = v; renderPlayCount(); });
+    }
+    function hitPlayCount() {
+      /* 先に手元の表示値を +1 して即時反映し、裏で hit して返ってきた値に合わせる */
+      if (playCount !== null) { playCount += 1; renderPlayCount(); }
+      playsRequest("hit", v => { playCount = v; renderPlayCount(); });
+    }
     /* リザルト数字のカウントアップ（モーション軽減設定では即時表示） */
     function countUp(elm, target, dur, fmt) {
       if (!elm) return;
@@ -6704,6 +6741,10 @@
     function startGame() {
       /* 協力プレイのゲストは自分では始められない（ホストの開始に追随する） */
       if (window.__coop && window.__coop.blockGuestStart()) return;
+      /* 総プレイ数カウンター：自分から新規ゲームを始めたときだけ +1 する。
+         ホストの開始に追随するゲスト側の startGame では数えない（中断セーブの
+         復帰はそもそも startGame を通らないので対象外）。非同期で投げっぱなし */
+      if (!(window.__coop && window.__coop.isGuestLive())) hitPlayCount();
       audio();
       G.difficulty = selectedDifficulty;
       G.character = selectedCharacter;
@@ -6805,6 +6846,7 @@
       el("titleScr").classList.add("on");
       G.state = "title";
       updateTitleBest();
+      fetchPlayCount(); /* タイトルに戻るたびに総プレイ数を最新化（失敗時は無言） */
       refreshResumeUI(); /* 中断中のランが残っていれば「つづきから再開」を出す */
     }
     /* ---------------- クリア＆無限モード ----------------
@@ -7520,6 +7562,8 @@
     initNicknameUI();
     initA2hs();
     updateTitleBest();
+    renderPlayCount();
+    fetchPlayCount(); /* 初回タイトル表示：総プレイ数を取得（失敗時は「―」のまま） */
     refreshResumeUI();
     updateTitleGear();
     refreshWalletUI();
