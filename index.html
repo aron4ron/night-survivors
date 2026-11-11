@@ -2363,7 +2363,7 @@
       combo: 0, comboT: 0, maxCombo: 0, comboTier: 0, feverT: 0, feverLatch: false, chestsOpened: 0,
       /* 実績判定用：このランでダメージを受けたか／ラン開始時点の累計（撃破・宝箱）スナップショット */
       tookDamage: false, baseKills: 0, baseChests: 0,
-      xp: 0, level: 1, xpNext: 8, pendingLv: 0,
+      xp: 0, level: 1, xpNext: 8, pendingLv: 0, sweepDoneLv: 0,
       players: [], enemies: [], projs: [], gems: [], items: [], chests: [], floats: [], parts: [], bolts: [], confetti: [], slashes: [],
       /* 第3弾追加：落下中の隕石／炎の床／敵の矢。いずれも一過性なので中断セーブには含めない */
       meteors: [], floors: [], eprojs: [],
@@ -2468,7 +2468,7 @@
     }
 
     function resetGame() {
-      G.time = 0; G.kills = 0; G.xp = 0; G.level = 1; G.xpNext = xpForLevel(1); G.pendingLv = 0;
+      G.time = 0; G.kills = 0; G.xp = 0; G.level = 1; G.xpNext = xpForLevel(1); G.pendingLv = 0; G.sweepDoneLv = 0;
       G.combo = 0; G.comboT = 0; G.maxCombo = 0; G.comboTier = 0; G.feverT = 0; G.feverLatch = false; G.chestsOpened = 0;
       G.tookDamage = false;
       try { const bs = loadStats(); G.baseKills = bs.kills || 0; G.baseChests = bs.chests || 0; } catch (e) { G.baseKills = 0; G.baseChests = 0; }
@@ -4479,6 +4479,59 @@
       let cx = 0, cy = 0, n = 0;
       for (const p of G.players) if (p.alive && !p.downed) { cx += p.x; cy += p.y; n++; }
       if (n) { G.cam.x = cx / n; G.cam.y = cy / n; }
+
+      /* ---------- 10レベルごとの全アイテム自動回収 ----------
+         チームレベルが10の倍数（Lv10・20・30…）に到達したら、その時点で
+         マップ上にある敵ドロップ由来の取得可能アイテム（XPジェムと
+         ピックアップアイテム）をすべて、通常取得と同じ扱いで回収する。
+         ドロップが溜まって画面・処理が重くなるのを防ぐのが目的で、
+         宝箱（設置・討伐報酬オブジェクト）は対象外。
+         update() はソロ／協力ホストでのみ回るため、協力プレイでも判定・
+         発動はホスト側だけが行い、全プレイヤー分をまとめて回収する
+         （ゲスト側で二重に発動することはない）。
+         回収したXPでさらにレベルが上がり次の10の倍数に届いた場合は
+         その場で続けて回収し、増えた pendingLv はこの後の openLevelUp()
+         が既存フロー通り連続で処理する */
+      {
+        let sweepLv = Math.floor(G.level / 10) * 10;
+        while (sweepLv > 0 && sweepLv > (G.sweepDoneLv || 0)) {
+          G.sweepDoneLv = sweepLv;
+          /* 対象は発動時点のスナップショット：回収効果（爆弾・核など）で
+             新たに落ちたドロップは今回の対象に含めず、マップに残す */
+          const sweepGems = G.gems.filter(g => !g.got);
+          const sweepItems = G.items.filter(i => !i.got);
+          if (sweepGems.length || sweepItems.length) {
+            for (const g of sweepGems) g.got = true;
+            for (const it of sweepItems) it.got = true;
+            G.gems = G.gems.filter(g => !g.got);
+            G.items = G.items.filter(i => !i.got);
+            /* ジェムは通常取得と同じく経験値へ加算（取得音の連鎖も合わせる） */
+            let picked = 0;
+            for (const g of sweepGems) { gainXp(g.val); picked++; }
+            if (picked) { G.gemChain = Math.min(G.gemChain + picked, 30); SE.gem(G.gemChain); }
+            /* アイテムは通常取得と同じ効果を、最寄りのプレイヤーへ発動する */
+            for (const it of sweepItems) {
+              const p = nearestPlayer(it.x, it.y) || G.players[0];
+              if (p) applyItem(it, p);
+            }
+            /* 演出：消えたドロップの場所にきらめき（上限付きで重くしない）
+               ＋各プレイヤーに金のリングと到達通知テキスト */
+            const fxSrc = sweepGems.concat(sweepItems);
+            const fxStep = Math.max(1, Math.floor(fxSrc.length / 36));
+            for (let i = 0; i < fxSrc.length; i += fxStep) {
+              const s = fxSrc[i];
+              spawnParts(s.x, s.y, s.color || "#fbbf24", 2, 70);
+            }
+            for (const p of G.players) {
+              if (!p.alive || p.downed) continue;
+              G.rings.push({ x: p.x, y: p.y, t: 0, life: 0.5, maxR: 170, color: "#fbbf24" });
+              addFloat(p.x, p.y - 52, "Lv" + sweepLv + " 到達！ 全アイテム回収！", "#fde68a", 19);
+            }
+            [1046, 1318, 1568].forEach((f, i) => setTimeout(() => beep(f, 0.1, "sine", 0.04), i * 55));
+          }
+          sweepLv = Math.floor(G.level / 10) * 10;
+        }
+      }
 
       if (G.pendingLv > 0) openLevelUp();
       syncBuffHud();
@@ -7165,6 +7218,8 @@
       /* ここから保存したラン状態で上書きする */
       G.time = d.time; G.kills = d.kills || 0;
       G.xp = d.xp || 0; G.level = d.level; G.xpNext = d.xpNext || xpForLevel(d.level); G.pendingLv = d.pendingLv || 0;
+      /* 全回収は到達した瞬間だけ発動する：復元時点ですでに過ぎている10の倍数は発動済みとして扱う */
+      G.sweepDoneLv = Math.floor(G.level / 10) * 10;
       G.combo = d.combo || 0; G.comboT = d.comboT || 0; G.maxCombo = d.maxCombo || 0; G.comboTier = d.comboTier || 0;
       G.feverT = d.feverT || 0; G.feverLatch = !!d.feverLatch; G.chestsOpened = d.chestsOpened || 0;
       G.tookDamage = !!d.tookDamage; G.baseKills = d.baseKills || 0; G.baseChests = d.baseChests || 0;
