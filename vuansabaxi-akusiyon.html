@@ -26,6 +26,13 @@
            収まっている端末・表示方法では 0 になるので、その場合は従来通り */
         --sat: env(safe-area-inset-top, 0px);
         --sab: env(safe-area-inset-bottom, 0px);
+        /* #wrap 下端が「実際に見えている領域（visualViewport）」の下端より
+           下にはみ出している量。JS の resize() が実測して px で書き込む。
+           アプリ内ブラウザ等で WebView が画面実寸より短いと、#wrap の高さ
+           （画面実寸候補を含む最大値）が見える範囲を超え、下端アンカーの
+           HUD が見えない領域へ押し出されてしまう（HPゲージ消失の原因）。
+           下部HUDの bottom にこの分を足して、常に見える底へ吸着させる */
+        --vbot: 0px;
         --sal: env(safe-area-inset-left, 0px);
         --sar: env(safe-area-inset-right, 0px);
         --panel: #101527;
@@ -103,7 +110,7 @@
       #kills { margin-top: 3px; font-size: 13px; color: var(--sub); letter-spacing: .08em; }
       #kills b { color: var(--ink); font-size: 15px; }
       #hpwrap {
-        position: absolute; left: calc(10px + var(--sal)); bottom: calc(12px + var(--sab)); width: min(300px, 44vw);
+        position: absolute; left: calc(10px + var(--sal)); bottom: calc(12px + var(--sab) + var(--vbot)); width: min(300px, 44vw);
       }
       #hplabel { font-size: 12px; color: var(--sub); letter-spacing: .1em; margin-bottom: 3px; }
       #hplabel b { color: var(--ink); font-size: 14px; }
@@ -114,7 +121,7 @@
         transition: width .12s ease;
       }
       #build {
-        position: absolute; right: calc(10px + var(--sar)); bottom: calc(12px + var(--sab)); display: flex; flex-direction: column;
+        position: absolute; right: calc(10px + var(--sar)); bottom: calc(12px + var(--sab) + var(--vbot)); display: flex; flex-direction: column;
         gap: 3px; align-items: flex-end; max-width: 46vw;
       }
       .chip {
@@ -1357,7 +1364,7 @@
     const cv = document.getElementById("game");
     const wrapEl = document.getElementById("wrap");
     const ctx = cv.getContext("2d");
-    let VW = 0, VH = 0, DPR = 1, wrapH = 0;
+    let VW = 0, VH = 0, DPR = 1, wrapH = 0, lastVbot = -1;
     /* 100lvh（ツールバー裏まで含む最大ビューポート）と 100dvh（動的
        ビューポート）の実測用プローブ。
        iPhone 実機では visualViewport.height が画面本来の高さより小さい値の
@@ -1447,6 +1454,23 @@
         wrapEl.style.height = wrapH + "px";
         wrapEl.style.top = target.top + "px";
         wrapEl.style.bottom = "auto";
+      }
+      /* 下端はみ出し量（--vbot）の実測：#wrap の下端が、実際に見えている
+         領域（visualViewport）の下端よりどれだけ下にあるか。アプリ内
+         ブラウザのように WebView が画面実寸より短い環境では、画面実寸
+         候補を採った #wrap が見える範囲を超えて伸び、下端アンカーの
+         HUD（HPゲージ等）が見えない領域に押し出されてしまう。はみ出し
+         分だけ下部HUDを持ち上げて、見える底へ吸着させる。通常環境
+         （vv の下端＝#wrap の下端）では 0 になり従来通り */
+      const vvNow = window.visualViewport;
+      let vbotGap = 0;
+      if (vvNow && wrapH > 0) {
+        const visBottom = Math.round(vvNow.offsetTop || 0) + Math.round(vvNow.height || 0);
+        vbotGap = Math.max(0, Math.min(wrapH, (target.top + wrapH) - visBottom));
+      }
+      if (vbotGap !== lastVbot) {
+        lastVbot = vbotGap;
+        document.documentElement.style.setProperty("--vbot", vbotGap + "px");
       }
       VW = cv.clientWidth || window.innerWidth;
       VH = cv.clientHeight || window.innerHeight;
