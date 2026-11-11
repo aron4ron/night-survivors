@@ -2564,30 +2564,87 @@
       /* ノブは指の実位置（半径内にクランプ）にそのまま吸着させる */
       knobEl.style.transform = "translate(calc(-50% + " + dx + "px), calc(-50% + " + dy + "px))";
     }
+    /* ピンチズーム：2本目の指が触れたらスティックを中断してピンチを優先する。
+       倍率はこの端末の画面だけに効く表示専用の値で、ゲームの数値には一切連動しない */
+    const pinch = { active: false, id2: null, x1: 0, y1: 0, x2: 0, y2: 0, d0: 1, z0: 1 };
+    const ZOOM_MIN = 0.6, ZOOM_MAX = 1.8;
+    function setZoomTarget(z) { ZOOM_T = clamp(z, ZOOM_MIN, ZOOM_MAX); }
+    function pinchSetTarget() {
+      const d = Math.hypot(pinch.x2 - pinch.x1, pinch.y2 - pinch.y1);
+      setZoomTarget(pinch.z0 * d / pinch.d0);
+    }
+    /* ピンチ終了後、残った指の現在位置をスティック原点にし直して再開する
+       （原点＝指位置なので入力はゼロから立ち上がり、キャラが急に走り出さない） */
+    function joyResumeAt(x, y) {
+      joy.active = true; joy.ox = x; joy.oy = y; joy.dx = 0; joy.dy = 0;
+      joyEl.style.display = "block";
+      joyPlace();
+      knobEl.style.transform = "translate(-50%,-50%)";
+    }
     cv.addEventListener("pointerdown", e => {
-      if (G.state !== "playing" || joy.active) return;
+      if (G.state !== "playing") return;
       e.preventDefault();
+      if (pinch.active) return; /* 3本目以降の指は無視 */
+      if (joy.active) {
+        /* 2本目：スティックを中断し、この時点の指間距離と倍率をピンチの基準にする */
+        pinch.active = true; pinch.id2 = e.pointerId;
+        pinch.x1 = joy.px; pinch.y1 = joy.py; pinch.x2 = e.clientX; pinch.y2 = e.clientY;
+        pinch.d0 = Math.max(1, Math.hypot(pinch.x2 - pinch.x1, pinch.y2 - pinch.y1));
+        pinch.z0 = ZOOM_T;
+        joy.active = false; joy.dx = 0; joy.dy = 0; joyEl.style.display = "none";
+        try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+        return;
+      }
       joy.active = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = 0; joy.dy = 0;
+      joy.px = e.clientX; joy.py = e.clientY;
       joyEl.style.display = "block";
       joyPlace();
       knobEl.style.transform = "translate(-50%,-50%)";
       try { cv.setPointerCapture(e.pointerId); } catch (err) {}
     });
     cv.addEventListener("pointermove", e => {
+      if (pinch.active) {
+        if (e.pointerId === joy.id) { pinch.x1 = e.clientX; pinch.y1 = e.clientY; joy.px = e.clientX; joy.py = e.clientY; }
+        else if (e.pointerId === pinch.id2) { pinch.x2 = e.clientX; pinch.y2 = e.clientY; }
+        else return;
+        pinchSetTarget();
+        return;
+      }
       if (!joy.active || e.pointerId !== joy.id) return;
       /* まとめ送りされた座標のうち最新を使い、入力の遅れを最小にする */
       if (typeof e.getCoalescedEvents === "function") {
         const evs = e.getCoalescedEvents();
         if (evs && evs.length) e = evs[evs.length - 1];
       }
+      joy.px = e.clientX; joy.py = e.clientY;
       joyApply(e.clientX, e.clientY);
     });
     function joyEnd(e) {
+      if (pinch.active) {
+        if (e.pointerId === pinch.id2) {
+          /* 2本目が離れた：残った1本目の現在位置でスティックを再開 */
+          pinch.active = false; pinch.id2 = null;
+          if (joy.id != null) joyResumeAt(pinch.x1, pinch.y1);
+        } else if (e.pointerId === joy.id) {
+          /* 1本目が離れた：残った2本目をスティックとして引き継ぐ */
+          pinch.active = false;
+          joy.id = pinch.id2; pinch.id2 = null;
+          joy.px = pinch.x2; joy.py = pinch.y2;
+          joyResumeAt(pinch.x2, pinch.y2);
+        }
+        return;
+      }
       if (e.pointerId !== joy.id) return;
       joy.active = false; joy.id = null; joy.dx = 0; joy.dy = 0; joyEl.style.display = "none";
     }
     cv.addEventListener("pointerup", joyEnd);
     cv.addEventListener("pointercancel", joyEnd);
+    /* PC：マウスホイールでも同じ倍率変更（プレイ中のみ。ページスクロールは元々無い画面） */
+    cv.addEventListener("wheel", e => {
+      if (G.state !== "playing") return;
+      e.preventDefault();
+      setZoomTarget(ZOOM_T * Math.exp(-e.deltaY * 0.0016));
+    }, { passive: false });
     /* スクロール/引っ張って更新の発生源ブロック（passive:false でないと止められない）。
        プレイ中は画面のどこをドラッグしてもページは動かず、ジェスチャ判定に
        スティック操作を横取りされない */
@@ -3073,7 +3130,7 @@
     }
     function drawChest(ch) {
       const [sx, sy] = w2s(ch.x, ch.y);
-      if (sx < -70 || sy < -70 || sx > VW + 70 || sy > VH + 70) return;
+      if (sx < viewL - 70 || sy < viewT - 70 || sx > viewR + 70 || sy > viewB + 70) return;
       const pop = ch.t < 0.22 ? (0.5 + (ch.t / 0.22) * 0.5) : 1;
       const bob = Math.sin(G.time * 3.2 + ch.ph) * 2.5;
       const pulse = 0.75 + Math.sin(G.time * 5 + ch.ph) * 0.25;
@@ -3597,7 +3654,7 @@
     }
     function drawDog(dog) {
       const [sx, sy] = w2s(dog.x, dog.y);
-      if (sx < -60 || sy < -60 || sx > VW + 60 || sy > VH + 60) return;
+      if (sx < viewL - 60 || sy < viewT - 60 || sx > viewR + 60 || sy > viewB + 60) return;
       const run = dog.moving ? Math.sin(dog.animT * 16) : 0;
       const bob = dog.moving ? Math.abs(Math.sin(dog.animT * 16)) * 2 : Math.sin(dog.animT * 2.2) * 0.7;
       const wag = Math.sin(dog.animT * (dog.moving ? 15 : 7)) * 4;
@@ -4831,6 +4888,17 @@
     }
 
     /* ---------------- 描画 ---------------- */
+    /* カメラズーム（表示専用）：ZOOM が現在値、ZOOM_T が目標値で、draw() が毎フレーム
+       滑らかに寄せる。ワールド描画だけを画面中心まわりに拡縮し、DOM の HUD や
+       ミニマップ（別キャンバス）には効かない。当たり判定・敵AI・スポーン等の
+       ゲーム数値は従来通り VW/VH 基準のままで、ズームには連動させない。
+       viewL/T/R/B は拡縮後の可視範囲（変換前のスクリーン座標系）で、カリング判定用 */
+    let ZOOM = 1, ZOOM_T = 1;
+    let viewL = 0, viewT = 0, viewR = 0, viewB = 0;
+    function resetZoom() {
+      ZOOM = 1; ZOOM_T = 1;
+      pinch.active = false; pinch.id2 = null;
+    }
     function w2s(x, y) {
       return [x - G.cam.x + VW / 2 + (G.shX || 0), y - G.cam.y + VH / 2 + (G.shY || 0)];
     }
@@ -4839,17 +4907,29 @@
       /* 画面シェイクはフレーム内で1回だけ決め、全オブジェクトで共有する */
       G.shX = G.shake ? rand(-G.shake, G.shake) * 0.4 : 0;
       G.shY = G.shake ? rand(-G.shake, G.shake) * 0.4 : 0;
+      /* ズームを目標倍率へ滑らかに寄せ、可視範囲（カリング用）を更新する */
+      ZOOM += (ZOOM_T - ZOOM) * 0.22;
+      if (Math.abs(ZOOM_T - ZOOM) < 0.001) ZOOM = ZOOM_T;
+      viewL = VW / 2 - (VW / 2) / ZOOM; viewR = VW / 2 + (VW / 2) / ZOOM;
+      viewT = VH / 2 - (VH / 2) / ZOOM; viewB = VH / 2 + (VH / 2) / ZOOM;
       const isSnow = G.stage === "snow";
       const isVol = G.stage === "volcano";
       ctx.fillStyle = isSnow ? "#cfdfef" : (isVol ? "#241c18" : "#6aa854");
       ctx.fillRect(0, 0, VW, VH);
-      /* 地面：事前生成タイルをカメラに合わせて敷き詰める（継ぎ目なし） */
+      /* ここからワールド描画：画面中心を軸にズーム倍率で拡縮する
+         （restore はビネット／閃光の直前。画面演出とミニマップはズームしない） */
+      ctx.save();
+      ctx.translate(VW / 2, VH / 2); ctx.scale(ZOOM, ZOOM); ctx.translate(-VW / 2, -VH / 2);
+      /* 地面：事前生成タイルをカメラに合わせて敷き詰める（継ぎ目なし）。
+         ズームアウト時は可視範囲が画面より広がるので、タイルもそこまで敷く */
       const TS = 512;
       const TILE = isSnow ? SNOW_TILE : (isVol ? VOLCANO_TILE : GROUND_TILE);
       let gox = (VW / 2 - G.cam.x + G.shX) % TS; if (gox > 0) gox -= TS;
       let goy = (VH / 2 - G.cam.y + G.shY) % TS; if (goy > 0) goy -= TS;
-      for (let gx = gox; gx < VW; gx += TS)
-        for (let gy = goy; gy < VH; gy += TS)
+      while (gox > viewL) gox -= TS;
+      while (goy > viewT) goy -= TS;
+      for (let gx = gox; gx < viewR; gx += TS)
+        for (let gy = goy; gy < viewB; gy += TS)
           ctx.drawImage(TILE, gx, gy);
       /* 漂う光の粉（花粉のような微粒子）／雪原では舞う雪、火山では舞い上がる火の粉になる */
       ctx.fillStyle = isSnow ? "#ffffff" : (isVol ? "#fdba74" : "#fff3b0");
@@ -4871,7 +4951,7 @@
       for (const g of G.gems) {
         const bob = Math.sin(G.time * 3.2 + g.x * 0.35 + g.y * 0.21) * 1.6;
         const [sx, sy] = w2s(g.x, g.y + bob);
-        if (sx < -24 || sy < -24 || sx > VW + 24 || sy > VH + 24) continue;
+        if (sx < viewL - 24 || sy < viewT - 24 || sx > viewR + 24 || sy > viewB + 24) continue;
         const pulse = 1 + Math.sin(G.time * 4.5 + g.x * 0.8) * 0.1;
         const gs = g.r * 5.4 * pulse;
         ctx.globalAlpha = 0.5;
@@ -4899,7 +4979,7 @@
       for (const it of G.items) {
         const st = ITEM_STYLE[it.kind] || ITEM_STYLE.heal;
         const [sx, sy] = w2s(it.x, it.y + Math.sin(G.time * 3) * 3);
-        if (sx < -30 || sy < -30 || sx > VW + 30 || sy > VH + 30) continue;
+        if (sx < viewL - 30 || sy < viewT - 30 || sx > viewR + 30 || sy > viewB + 30) continue;
         ctx.globalAlpha = 0.45;
         ctx.drawImage(glowTex(st.glow), sx - 22, sy - 22, 44, 44);
         ctx.globalAlpha = 1;
@@ -5012,7 +5092,7 @@
       /* 炎の床（星屑の終末）：燃え続ける範囲を地面に描く */
       for (const f of G.floors) {
         const [sx, sy] = w2s(f.x, f.y);
-        if (sx < -f.r - 30 || sy < -f.r - 30 || sx > VW + f.r + 30 || sy > VH + f.r + 30) continue;
+        if (sx < viewL - f.r - 30 || sy < viewT - f.r - 30 || sx > viewR + f.r + 30 || sy > viewB + f.r + 30) continue;
         const fade = clamp(f.life - f.t, 0, 1);
         const fl = 0.75 + Math.sin(G.time * 9 + f.x) * 0.25;
         const fg = ctx.createRadialGradient(sx, sy, 2, sx, sy, f.r);
@@ -5026,7 +5106,7 @@
       /* 落下中の隕石：着弾点の予告サークル＋上空から迫る火球 */
       for (const m of G.meteors) {
         const [sx, sy] = w2s(m.x, m.y);
-        if (sx < -160 || sy < -260 || sx > VW + 160 || sy > VH + 60) continue;
+        if (sx < viewL - 160 || sy < viewT - 260 || sx > viewR + 160 || sy > viewB + 60) continue;
         const prog = 1 - clamp(m.t / (m.delay || 0.55), 0, 1);
         ctx.strokeStyle = "rgba(251,146,60," + (0.45 + prog * 0.5) + ")"; ctx.lineWidth = 2.4;
         ctx.beginPath(); ctx.arc(sx, sy, m.radius, 0, TAU); ctx.stroke();
@@ -5043,7 +5123,7 @@
       /* 敵の矢（弓スケルトン） */
       for (const a of G.eprojs) {
         const [sx, sy] = w2s(a.x, a.y);
-        if (sx < -30 || sy < -30 || sx > VW + 30 || sy > VH + 30) continue;
+        if (sx < viewL - 30 || sy < viewT - 30 || sx > viewR + 30 || sy > viewB + 30) continue;
         const aa = Math.atan2(a.vy, a.vx);
         ctx.save(); ctx.translate(sx, sy); ctx.rotate(aa);
         ctx.strokeStyle = "#d6d3d1"; ctx.lineWidth = 2.4; ctx.lineCap = "round";
@@ -5363,6 +5443,7 @@
         ctx.strokeText(f.txt, sx, sy); ctx.fillText(f.txt, sx, sy);
       }
       ctx.globalAlpha = 1;
+      ctx.restore(); /* ワールド描画ここまで。以後の画面演出はズームの影響を受けない */
       /* 被ダメ時の赤ビネット（自分のHPで判定） */
       const p0 = localPlayer();
       if (p0 && p0.alive && p0.hp < p0.maxHp * 0.3) {
@@ -5599,7 +5680,7 @@
     }
     function drawDragonTele(e) {
       const [sx, sy] = w2s(e.x, e.y);
-      if (sx < -420 || sy < -420 || sx > VW + 420 || sy > VH + 420) return;
+      if (sx < viewL - 420 || sy < viewT - 420 || sx > viewR + 420 || sy > viewB + 420) return;
       const pulse = 0.5 + Math.sin(G.time * 10) * 0.5;
       if (e.mode === "breathTele") {
         drawWedge(sx, sy, e.teleAng, DRAGON.breathRange, DRAGON.breathHalf,
@@ -5771,7 +5852,7 @@
     function drawEnemy(e) {
       const [sx, sy] = w2s(e.x, e.y);
       const cm = e.type === "dragon" ? 320 : 90;
-      if (sx < -cm || sy < -cm || sx > VW + cm || sy > VH + cm) return;
+      if (sx < viewL - cm || sy < viewT - cm || sx > viewR + cm || sy > viewB + cm) return;
       if (e.type === "dragon") { drawDragon(e, sx, sy); return; }
       const base = ENEMIES[e.type].color;
       const col = e.flash > 0 ? "#ffffff" : base;
@@ -6812,6 +6893,7 @@
       refreshDailyUI();
       syncChalHud();
       resetGame();
+      resetZoom(); /* ズーム倍率はラン中だけ保持：新規ランは 1.0 倍から */
       consumeRunItems(); /* ショップの消費アイテム：所持していれば自動で消費してこのランに付ける */
       clearRunSave(); /* 新規ラン開始：前の中断セーブは破棄する */
       refreshResumeUI();
@@ -6898,6 +6980,7 @@
       el("hud").classList.remove("on");
       el("titleScr").classList.add("on");
       G.state = "title";
+      resetZoom(); /* タイトルに戻ったらズーム倍率を 1.0 倍にリセット */
       updateTitleBest();
       fetchPlayCount(); /* タイトルに戻るたびに総プレイ数を最新化（失敗時は無言） */
       refreshResumeUI(); /* 中断中のランが残っていれば「つづきから再開」を出す */
@@ -7284,6 +7367,7 @@
       G.meteors = []; G.floors = []; G.eprojs = [];
       G.boss = d.bossUid ? (G.enemies.find(e => e.uid === d.bossUid && !e.dead) || null) : null;
       /* 画面まわりを startGame と同じ状態へ整える */
+      resetZoom(); /* 中断セーブの復元時もズームは 1.0 倍から開始（セーブ形式は無変更） */
       el("diffHud").textContent = "― " + diffCfg().name + " ―";
       el("charHud").textContent = charCfg(G.character).label;
       syncChalHud();
