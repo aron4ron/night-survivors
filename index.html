@@ -2565,81 +2565,121 @@
       /* ノブは指の実位置（半径内にクランプ）にそのまま吸着させる */
       knobEl.style.transform = "translate(calc(-50% + " + dx + "px), calc(-50% + " + dy + "px))";
     }
-    /* ピンチズーム：2本目の指が触れたらスティックを中断してピンチを優先する。
-       倍率はこの端末の画面だけに効く表示専用の値で、ゲームの数値には一切連動しない */
-    const pinch = { active: false, id2: null, x1: 0, y1: 0, x2: 0, y2: 0, d0: 1, z0: 1 };
+    /* ピンチズーム：2本指で画面表示だけを拡縮する。倍率はこの端末の画面だけに
+       効く表示専用の値で、ゲームの数値には一切連動しない。
+       ポインタ管理は「いまキャンバスに触れているポインタの集合（pointers）」を
+       唯一の実態とし、スティック／ピンチの状態は常にそこから導く。
+       旧実装は joy.id と pinch.id2 の2変数だけで指を数えていたため、
+       ブラウザにジェスチャを横取りされる等で pointerup を1つ取りこぼすと
+       「離したはずの指が残っている」状態になり、以降のタッチが全部
+       2本目＝ピンチと誤判定されて、ズームだけが動いて移動できなくなった。
+       pointercancel / lostpointercapture / 画面が隠れた時にも必ず集合から
+       除去し、残り本数に合わせてスティックへ復帰するので固まらない。
+       またピンチは指間距離が PINCH_ARM 以上変化して初めて効き始めるので、
+       誤って触れた2本目ではズームも移動停止も起きない */
+    const pointers = new Map(); /* pointerId -> { x, y }（いま触れている指） */
+    const pinch = { active: false, id2: null, x1: 0, y1: 0, x2: 0, y2: 0, d0: 1, z0: 1, armed: false };
     const ZOOM_MIN = 0.6, ZOOM_MAX = 1.8;
+    const PINCH_ARM = 12; /* この距離変化まではピンチとみなさない（誤タッチ対策） */
     function setZoomTarget(z) { ZOOM_T = clamp(z, ZOOM_MIN, ZOOM_MAX); }
-    function pinchSetTarget() {
-      const d = Math.hypot(pinch.x2 - pinch.x1, pinch.y2 - pinch.y1);
-      setZoomTarget(pinch.z0 * d / pinch.d0);
+    /* 入力をすべて初期状態に戻す（ラン開始・タイトル復帰・割り込み時） */
+    function resetInput() {
+      pointers.clear();
+      pinch.active = false; pinch.id2 = null; pinch.armed = false;
+      joy.active = false; joy.id = null; joy.dx = 0; joy.dy = 0;
+      joyEl.style.display = "none";
     }
-    /* ピンチ終了後、残った指の現在位置をスティック原点にし直して再開する
+    /* 指定した指の現在位置をスティック原点にして（再）開始する
        （原点＝指位置なので入力はゼロから立ち上がり、キャラが急に走り出さない） */
-    function joyResumeAt(x, y) {
-      joy.active = true; joy.ox = x; joy.oy = y; joy.dx = 0; joy.dy = 0;
+    function joyResumeAt(id, x, y) {
+      joy.active = true; joy.id = id; joy.ox = x; joy.oy = y; joy.dx = 0; joy.dy = 0;
+      joy.px = x; joy.py = y;
       joyEl.style.display = "block";
       joyPlace();
       knobEl.style.transform = "translate(-50%,-50%)";
+    }
+    function pinchSync() {
+      const a = pointers.get(joy.id), b = pointers.get(pinch.id2);
+      if (!a || !b) return;
+      pinch.x1 = a.x; pinch.y1 = a.y; pinch.x2 = b.x; pinch.y2 = b.y;
+    }
+    function pinchApply() {
+      pinchSync();
+      const d = Math.hypot(pinch.x2 - pinch.x1, pinch.y2 - pinch.y1);
+      if (!pinch.armed) {
+        /* 指間距離がほとんど変わっていない間はピンチを開始しない：
+           そのまま離せば何も起きなかったことになる */
+        if (Math.abs(d - pinch.d0) < PINCH_ARM) return;
+        pinch.armed = true; pinch.d0 = d; pinch.z0 = ZOOM_T; /* ここを新たな基準にして倍率の跳ねを防ぐ */
+        return;
+      }
+      setZoomTarget(pinch.z0 * d / Math.max(1, pinch.d0));
     }
     cv.addEventListener("pointerdown", e => {
       if (G.state !== "playing") return;
       e.preventDefault();
-      if (pinch.active) return; /* 3本目以降の指は無視 */
-      if (joy.active) {
-        /* 2本目：スティックを中断し、この時点の指間距離と倍率をピンチの基準にする */
-        pinch.active = true; pinch.id2 = e.pointerId;
-        pinch.x1 = joy.px; pinch.y1 = joy.py; pinch.x2 = e.clientX; pinch.y2 = e.clientY;
+      pointers.delete(e.pointerId); /* 同じIDの再通知は古い記録を捨てて数え直す */
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 1) {
+        /* 1本目：この指でスティックを開始する */
+        joyResumeAt(e.pointerId, e.clientX, e.clientY);
+      } else if (pointers.size === 2 && !pinch.active) {
+        /* 2本目：スティックを止め、この時点の指間距離と倍率をピンチの基準にする */
+        pinch.active = true; pinch.armed = false; pinch.id2 = e.pointerId;
+        pinchSync();
         pinch.d0 = Math.max(1, Math.hypot(pinch.x2 - pinch.x1, pinch.y2 - pinch.y1));
         pinch.z0 = ZOOM_T;
         joy.active = false; joy.dx = 0; joy.dy = 0; joyEl.style.display = "none";
-        try { cv.setPointerCapture(e.pointerId); } catch (err) {}
-        return;
       }
-      joy.active = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = 0; joy.dy = 0;
-      joy.px = e.clientX; joy.py = e.clientY;
-      joyEl.style.display = "block";
-      joyPlace();
-      knobEl.style.transform = "translate(-50%,-50%)";
+      /* 3本目以降は集合に数えるだけで、スティック／ピンチの対象にはしない */
       try { cv.setPointerCapture(e.pointerId); } catch (err) {}
     });
     cv.addEventListener("pointermove", e => {
+      const rec = pointers.get(e.pointerId);
+      if (!rec) return; /* 集合に無いポインタ（離脱を取りこぼした等）は相手にしない */
+      /* まとめ送りされた座標のうち最新を使い、入力の遅れを最小にする */
+      let cx = e.clientX, cy = e.clientY;
+      if (typeof e.getCoalescedEvents === "function") {
+        const evs = e.getCoalescedEvents();
+        if (evs && evs.length) { cx = evs[evs.length - 1].clientX; cy = evs[evs.length - 1].clientY; }
+      }
+      rec.x = cx; rec.y = cy;
       if (pinch.active) {
-        if (e.pointerId === joy.id) { pinch.x1 = e.clientX; pinch.y1 = e.clientY; joy.px = e.clientX; joy.py = e.clientY; }
-        else if (e.pointerId === pinch.id2) { pinch.x2 = e.clientX; pinch.y2 = e.clientY; }
-        else return;
-        pinchSetTarget();
+        if (e.pointerId === joy.id || e.pointerId === pinch.id2) pinchApply();
         return;
       }
       if (!joy.active || e.pointerId !== joy.id) return;
-      /* まとめ送りされた座標のうち最新を使い、入力の遅れを最小にする */
-      if (typeof e.getCoalescedEvents === "function") {
-        const evs = e.getCoalescedEvents();
-        if (evs && evs.length) e = evs[evs.length - 1];
-      }
-      joy.px = e.clientX; joy.py = e.clientY;
-      joyApply(e.clientX, e.clientY);
+      joy.px = cx; joy.py = cy;
+      joyApply(cx, cy);
     });
-    function joyEnd(e) {
-      if (pinch.active) {
-        if (e.pointerId === pinch.id2) {
-          /* 2本目が離れた：残った1本目の現在位置でスティックを再開 */
-          pinch.active = false; pinch.id2 = null;
-          if (joy.id != null) joyResumeAt(pinch.x1, pinch.y1);
-        } else if (e.pointerId === joy.id) {
-          /* 1本目が離れた：残った2本目をスティックとして引き継ぐ */
-          pinch.active = false;
-          joy.id = pinch.id2; pinch.id2 = null;
-          joy.px = pinch.x2; joy.py = pinch.y2;
-          joyResumeAt(pinch.x2, pinch.y2);
+    function pointerEnd(e) {
+      pointers.delete(e.pointerId);
+      if (pinch.active && (e.pointerId === pinch.id2 || e.pointerId === joy.id)) {
+        /* ピンチを構成していた指が離れた／キャンセルされた：ピンチを畳み、
+           まだ触れている指が1本残っていれば、その指でスティックを再開する */
+        pinch.active = false; pinch.id2 = null; pinch.armed = false;
+        if (pointers.size === 1) {
+          const rest = pointers.entries().next().value;
+          joyResumeAt(rest[0], rest[1].x, rest[1].y);
+        } else {
+          joy.active = false; joy.id = null; joy.dx = 0; joy.dy = 0; joyEl.style.display = "none";
         }
         return;
       }
-      if (e.pointerId !== joy.id) return;
-      joy.active = false; joy.id = null; joy.dx = 0; joy.dy = 0; joyEl.style.display = "none";
+      if (e.pointerId === joy.id) {
+        joy.active = false; joy.id = null; joy.dx = 0; joy.dy = 0; joyEl.style.display = "none";
+      }
     }
-    cv.addEventListener("pointerup", joyEnd);
-    cv.addEventListener("pointercancel", joyEnd);
+    cv.addEventListener("pointerup", pointerEnd);
+    cv.addEventListener("pointercancel", pointerEnd);
+    /* ポインタ捕捉が（up/cancel を伴わず）失われた場合も、指が離れたものとして
+       掃除する。通常の pointerup 後にも発火するが、その時は既に集合から
+       消えているので無害。これが「離したはずの指が残る」固まりへの保険になる */
+    cv.addEventListener("lostpointercapture", e => { if (pointers.has(e.pointerId)) pointerEnd(e); });
+    /* アプリ切替・割り込みで指の離脱を取りこぼしても、次に触れたときに
+       固まらないよう入力を全リセットする（キーボードの押しっぱなしも同様） */
+    window.addEventListener("blur", () => { resetInput(); for (const k in keys) keys[k] = false; });
+    document.addEventListener("visibilitychange", () => { if (document.hidden) resetInput(); });
     /* PC：マウスホイールでも同じ倍率変更（プレイ中のみ。ページスクロールは元々無い画面） */
     cv.addEventListener("wheel", e => {
       if (G.state !== "playing") return;
@@ -2663,9 +2703,16 @@
     cv.addEventListener("touchstart", e => {
       if (G.state === "playing" && e.cancelable) e.preventDefault();
     }, { passive: false });
+    /* iOS Safari のページ側ピンチズーム（画面全体が拡大・縮小されて操作不能に
+       なる）を発生源で止める。gesture 系イベントは passive:false を明示しないと
+       preventDefault が効かないことがあるため明示して登録する。ゲーム内の
+       ピンチズームは Pointer Events 側で処理するので競合しない */
     document.addEventListener("gesturestart", e => {
       if (!inOpenOverlay(e) && (G.state === "playing" || joy.active)) e.preventDefault();
-    });
+    }, { passive: false });
+    document.addEventListener("gesturechange", e => {
+      if (!inOpenOverlay(e) && (G.state === "playing" || joy.active)) e.preventDefault();
+    }, { passive: false });
 
     /* プレイヤー idx の移動入力（協力時は idx ごとに別ソースへ差し替え可能） */
     function inputVector(idx) {
@@ -4906,7 +4953,7 @@
     let viewL = 0, viewT = 0, viewR = 0, viewB = 0;
     function resetZoom() {
       ZOOM = 1; ZOOM_T = 1;
-      pinch.active = false; pinch.id2 = null;
+      resetInput(); /* ズームと一緒にスティック／ピンチの指管理も初期状態へ戻す */
     }
     function w2s(x, y) {
       return [x - G.cam.x + VW / 2 + (G.shX || 0), y - G.cam.y + VH / 2 + (G.shY || 0)];
